@@ -13,7 +13,7 @@ const cleanupUnusedFiles = require("./app/helpers/CleanupFiles");
 const app = express();
 
 //Configure CORS
-const allowedOrigins = [process.env.FRONTEND_URL, process.env.PRIVATE_IP];
+const allowedOrigins = [process.env.FRONTEND_URL];
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -67,7 +67,7 @@ db.mongoose
     process.exit();
   });
 
-app.get("/api", (req, res) => {
+app.get(["/", "/api"], (req, res) => {
   res.json({ message: "Welcome to dating application api." });
 });
 
