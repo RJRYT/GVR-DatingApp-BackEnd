@@ -12,7 +12,7 @@ const cleanupUnusedFiles = require("./app/helpers/CleanupFiles");
 
 const app = express();
 
-Configure CORS
+//Configure CORS
 const allowedOrigins = [process.env.FRONTEND_URL];
 
 const corsOptions = {
