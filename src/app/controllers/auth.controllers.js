@@ -87,7 +87,7 @@ exports.GoogleLogin = passport.authenticate("google", {
 });
 
 exports.PassportVerify = passport.authenticate("google", {
-  failureRedirect: process.env.FRONTEND_URL + "/home?error=GoogleOAuthFailed",
+  failureRedirect: process.env.FRONTEND_URL + "/login?error=GoogleOAuthFailed",
 });
 
 exports.GoogleCallBack = (req, res) => {
@@ -103,7 +103,7 @@ exports.GoogleCallBack = (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
   });
-  res.redirect(`${process.env.FRONTEND_URL}/home?token=${AccessToken}`);
+  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
 };
 
 exports.SendCode = async (req, res) => {
