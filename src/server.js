@@ -27,9 +27,12 @@ const app = express();
 //   credentials: true,
 // };
 
-// app.use(cors(corsOptions));
+var corsOptions = {
+  origin: '*',
+  optionsSuccessStatus: 200
+}
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 //request logger
 app.use(morgan("dev"));
