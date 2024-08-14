@@ -18,9 +18,13 @@ exports.test = (req, res) => {
 };
 
 exports.doLogin = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, phoneNumber } = req.body;
   try {
-    const user = await User.findOne({ email });
+    let query = {};
+    if(email)query.email = email;
+    else if(phoneNumber) query.phoneNumber = phoneNumber;
+    else return res.status(400).json({ message: "Missing credentials" });
+    const user = await User.findOne(query);
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
