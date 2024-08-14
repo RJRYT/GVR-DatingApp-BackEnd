@@ -21,8 +21,8 @@ exports.doLogin = async (req, res) => {
   const { email, password, phoneNumber } = req.body;
   try {
     let query = {};
-    if(email)query.email = email;
-    else if(phoneNumber) query.phoneNumber = phoneNumber;
+    if (email) query.email = email;
+    else if (phoneNumber) query.phoneNumber = phoneNumber;
     else return res.status(400).json({ message: "Missing credentials" });
     const user = await User.findOne(query);
     if (!user) return res.status(400).json({ message: "User not found" });
@@ -139,31 +139,34 @@ exports.VerifyCode = async (req, res) => {
   const { phoneNumber, otp } = req.body;
 
   const user = await User.findOne({ phoneNumber });
+  try {
+    if (user) {
+      client.verify.v2
+        .services(process.env.TWILIO_SERVICE_SID)
+        .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
+        .then(async (verification_check) => {
+          if (verification_check.status) {
+            const AccessToken = generateAccessToken({ id: user.id });
+            const RefreshToken = generateRefreshToken({ id: user.id });
 
-  if (user) {
-    client.verify.v2
-      .services(process.env.TWILIO_SERVICE_SID)
-      .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
-      .then(async (verification_check) => {
-        if (verification_check.status) {
-          const AccessToken = generateAccessToken({ id: user.id });
-          const RefreshToken = generateRefreshToken({ id: user.id });
+            res.cookie("accessToken", AccessToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+            });
 
-          res.cookie("accessToken", AccessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-          });
-
-          res.cookie("refreshToken", RefreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-          });
-          user.numberVerified = true;
-          await user.save();
-          res.status(200).send({ AccessToken });
-        }
-      });
-  } else {
-    res.status(400).send({ message: "Invalid OTP" });
+            res.cookie("refreshToken", RefreshToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+            });
+            user.numberVerified = true;
+            await user.save();
+            res.status(200).send({message: "Verification completed", AccessToken });
+          }
+        });
+    } else {
+      res.status(400).send({ message: "Invalid OTP" });
+    }
+  } catch (err) {
+    res.status(400).send({ message: err.message });
   }
 };
