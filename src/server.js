@@ -68,7 +68,7 @@ db.mongoose
   });
 
 app.get(["/", "/api"], (req, res) => {
-  res.json({ message: "Welcome to dating application api." });
+  res.status(200).json({ success:true, message: "Welcome to dating application api." });
 });
 
 require("./app/config/passport.config")(passport);
@@ -79,7 +79,7 @@ require("./app/routes/matches.routes")(app);
 
 //Notfound handling
 app.use(function (req, res) {
-  res.status(404).json({ message: "Resource not found" });
+  res.status(404).json({ success:false, message: "Resource not found" });
 });
 
 //Error handling
@@ -91,15 +91,15 @@ app.use(async function (err, req, res, next) {
   console.log(err, err.stack);
   res
     .status(500)
-    .json({ message: "An Unknown error occoured in server. Try again later" });
+    .json({ success:false, message: "An Unknown error occoured in server. Try again later" });
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  console.log(`${promise}, ${reason.stack}`, reason);
+  console.log(`[unhandledRejection]: `, reason);
 });
 
 process.on("uncaughtException", (err, origin) => {
-  console.log(`${err.stack}, ${origin}`);
+  console.log("[uncaughtException]: ", origin, err);
 });
 
 // Schedule the cleanup to run daily at midnight

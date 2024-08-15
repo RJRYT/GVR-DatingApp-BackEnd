@@ -5,6 +5,7 @@ module.exports = (app) => {
     var router = require("express").Router();
 
     router.get("/", matchesController.test);
+    router.post("/", matchesController.test);
 
     router.get(
       "/me",

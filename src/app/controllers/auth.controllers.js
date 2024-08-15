@@ -14,7 +14,7 @@ const client = new twilio(
 const User = require("../models").user;
 
 exports.test = (req, res) => {
-  res.json({ message: "hello world from auth" });
+  res.json({ status: 200, success: true, message: "hello world from auth" });
 };
 
 exports.doLogin = async (req, res) => {
@@ -23,13 +23,13 @@ exports.doLogin = async (req, res) => {
     let query = {};
     if (email) query.email = email;
     else if (phoneNumber) query.phoneNumber = phoneNumber;
-    else return res.status(400).json({ message: "Missing credentials" });
+    else return res.json({ status: 400, success: false, message: "Missing credentials" });
     const user = await User.findOne(query);
-    if (!user) return res.status(400).json({ message: "User not found" });
+    if (!user) return res.json({ status: 400, success: false, message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.json({ status: 400, success: false, message: "Invalid credentials" });
 
     const AccessToken = generateAccessToken({ id: user.id });
     const RefreshToken = generateRefreshToken({ id: user.id });
@@ -46,17 +46,17 @@ exports.doLogin = async (req, res) => {
       sameSite: 'None',
     });
 
-    res.json({ AccessToken });
+    res.json({ status: 200, success: true, message: "Login successful", AccessToken });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
   }
 };
 
 exports.doLogout = async (req, res) => {
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
-  res.json({ message: "Logout successful" });
+  res.json({ status: 200, success: true, message: "Logout successful" });
 };
 
 exports.doRegister = async (req, res) => {
@@ -65,40 +65,40 @@ exports.doRegister = async (req, res) => {
     let user = await User.findOne({
       $or: [{ email }, { phoneNumber }],
     });
-    if (user) return res.status(400).json({ message: "User already exists" });
+    if (user) return res.json({ status: 400, success: false, message: "User already exists" });
 
     client.verify.v2
-    .services(process.env.TWILIO_SERVICE_SID)
-    .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
-    .then(async (verification_check) => {
-      if (verification_check.status) {
-        user = new User({ username, email, password, phoneNumber });
-        const AccessToken = generateAccessToken({ id: user.id });
-        const RefreshToken = generateRefreshToken({ id: user.id });
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
+      .then(async (verification_check) => {
+        if (verification_check.status) {
+          user = new User({ username, email, password, phoneNumber });
+          const AccessToken = generateAccessToken({ id: user.id });
+          const RefreshToken = generateRefreshToken({ id: user.id });
 
-        res.cookie("accessToken", AccessToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: 'None',
-        });
+          res.cookie("accessToken", AccessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: 'None',
+          });
 
-        res.cookie("refreshToken", RefreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: 'None',
-        });
-        user.numberVerified = true;
-        await user.save();
-        res.status(200).send({ message: "Registration completed", AccessToken });
-      }
-    })
-    .catch((err) => {
-      console.log("Twilio verify error: ", err);
-      res.status(400).send({ message: "OTP expired/invalid. please generate a new one" });
-    })
+          res.cookie("refreshToken", RefreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: 'None',
+          });
+          user.numberVerified = true;
+          await user.save();
+          res.json({ status: 200, success: true, message: "Registration completed", AccessToken });
+        }
+      })
+      .catch((err) => {
+        console.log("Twilio verify error: ", err);
+        res.json({ status: 400, success: false, message: "OTP expired/invalid. please generate a new one" });
+      })
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
   }
 };
 
@@ -135,10 +135,10 @@ exports.SendCode = async (req, res) => {
     .verifications.create({ to: `+91${phoneNumber}`, channel: "sms" })
     .then((verification) => {
       console.log(verification.sid);
-      res.status(200).send({ message: "OTP sent successfully" });
+      res.json({ status: 200, success: true, message: "OTP sent successfully" });
     })
     .catch((error) => {
       console.log("Twilio sendcode error: ", error);
-      res.status(500).send({ message: "Failed to send OTP" });
+      res.status(500).send({ status: 200, success: false, message: "Failed to send OTP" });
     });
 };

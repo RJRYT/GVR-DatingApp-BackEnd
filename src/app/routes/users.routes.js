@@ -4,14 +4,23 @@ module.exports = (app) => {
   var router = require("express").Router();
 
   router.get("/", usersController.test);
+  router.post("/", usersController.test);
+
   router.get("/me", usersController.authMiddleware, usersController.CheckUser);
   router.post("/token", usersController.RefreshToken);
 
   router.post(
+    "/upload/images",
+    usersController.authMiddleware,
+    usersController.uploadImages.array("images", 5),
+    usersController.saveImages
+  );
+
+  router.post(
     "/upload/profilepics",
     usersController.authMiddleware,
-    usersController.uploadProfilePics.array("profilePics", 5),
-    usersController.saveUploadedPics
+    usersController.uploadProfilePic.single("profilePic"),
+    usersController.saveUploadedPic
   );
 
   router.post(

@@ -7,6 +7,12 @@ module.exports = (mongoose) => {
     uploadedAt: { type: Date, default: Date.now },
   });
 
+  const ImagesSchema = mongoose.Schema({
+    url: { type: String, reqired: true },
+    key: { type: String, reqired: true },
+    uploadedAt: { type: Date, default: Date.now },
+  });
+
   const ShortReelSchema = mongoose.Schema({
     url: { type: String, reqired: true },
     key: { type: String, reqired: true },
@@ -38,7 +44,8 @@ module.exports = (mongoose) => {
       smokingHabits: { type: String },
       drinkingHabits: { type: String },
       qualification: [{ label: String, value: String }],
-      profilePic: [ProfilePicSchema],
+      profilePic: ProfilePicSchema,
+      images: [ImagesSchema],
       shortReel: ShortReelSchema,
       professionType: { type: String },
       companyName: { type: String },

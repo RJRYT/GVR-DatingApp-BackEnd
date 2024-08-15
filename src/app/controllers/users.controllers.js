@@ -9,35 +9,35 @@ const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { generateAccessToken } = require("../config/token.config");
 
 exports.test = (req, res) => {
-  res.json({ message: "hello world from users" });
+  res.json({ status: 200, success: true, message: "hello world from users" });
 };
 
 // Middleware to protect routes
 exports.authMiddleware = (req, res, next) => {
   const token = req.header("x-auth-token") || req.cookies.accessToken;
   if (!token)
-    return res.status(401).json({ message: "No token, authorization denied" });
+    return res.status(401).json({ status: 401, success: false, message: "No token, authorization denied" });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ message: "Token is not valid" });
+    res.status(401).json({ status: 401, success: false, message: "Token is not valid" });
   }
 };
 
 exports.RefreshToken = async (req, res) => {
   const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
   if (!refreshToken) {
-    return res.status(403).json({ message: "Refresh token not found" });
+    return res.status(403).json({ status: 403, success: false, message: "Refresh token not found" });
   }
 
   jwt.verify(
     refreshToken,
     process.env.JWT_REFRESH_TOKEN_SECRET,
     (err, user) => {
-      if (err) return res.sendStatus(403);
+      if (err) return res.status(403).json({ status: 403, success: false, message: "Server error" });
 
       const accessToken = generateAccessToken({ id: user.id });
       res.cookie("accessToken", accessToken, {
@@ -46,7 +46,7 @@ exports.RefreshToken = async (req, res) => {
         sameSite: 'None',
       });
 
-      res.json({ accessToken });
+      res.json({ status: 200, success: true, message: "Token regenerated", accessToken });
     }
   );
 };
@@ -54,14 +54,14 @@ exports.RefreshToken = async (req, res) => {
 exports.CheckUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
-    res.json(user);
+    res.json({ status: 200, success: true, message: "User found", user });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ message: "Server Error" });
+    res.status(500).send({ status: 500, success: false, message: "Server Error" });
   }
 };
 
-exports.uploadProfilePics = multer({
+exports.uploadProfilePic = multer({
   storage: multerS3({
     s3: s3Config,
     bucket: process.env.S3_BUCKET,
@@ -73,7 +73,27 @@ exports.uploadProfilePics = multer({
       const userId = req.user.id;
       const randomString = crypto.randomBytes(6).toString("hex");
       const currentDate = new Date().toISOString().replace(/:/g, "-"); // Format date to avoid issues with colons
-      const uniqueName = `profilepics/${userId}_${randomString}_${currentDate}${path.extname(
+      const uniqueName = `profilepic/${userId}_${randomString}_${currentDate}${path.extname(
+        file.originalname
+      )}`;
+      cb(null, uniqueName);
+    },
+  }),
+});
+
+exports.uploadImages = multer({
+  storage: multerS3({
+    s3: s3Config,
+    bucket: process.env.S3_BUCKET,
+    acl: "public-read",
+    metadata: function (req, file, cb) {
+      cb(null, { fieldName: file.fieldname, originalname: file.originalname });
+    },
+    key: function (req, file, cb) {
+      const userId = req.user.id;
+      const randomString = crypto.randomBytes(6).toString("hex");
+      const currentDate = new Date().toISOString().replace(/:/g, "-"); // Format date to avoid issues with colons
+      const uniqueName = `images/${userId}_${randomString}_${currentDate}${path.extname(
         file.originalname
       )}`;
       cb(null, uniqueName);
@@ -101,38 +121,71 @@ exports.uploadReel = multer({
   }),
 });
 
-exports.saveUploadedPics = async (req, res) => {
+exports.saveUploadedPic = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     }
 
-    if (user.personalInfoSubmitted) {
-      return res
-        .status(400)
-        .json({ message: "Personal section already completed." });
+    // if (user.personalInfoSubmitted) {
+    //   return res.json({ status: 404, success: false, message: "Personal section already completed." });
+    // }
+
+    if (user.profilePic) {
+      const params = {
+        Bucket: process.env.S3_BUCKET,
+        Key: user.profilePic.key,
+      };
+      await s3Config.send(new DeleteObjectCommand(params));
     }
 
-    if (user.profilePic.length > 0) {
-      for (const pic of user.profilePic) {
+    user.profilePic = { url: req.file.location, key: req.file.key };
+
+    await user.save();
+    res.json({
+      status: 200, success: true, 
+      message: "Profile picture uploaded successfully",
+      profilePic: user.profilePic,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
+  }
+};
+
+exports.saveImages = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.json({ status: 404, success: false, message: "User not found" });
+    }
+
+    // if (user.personalInfoSubmitted) {
+    //   return res.json({ status: 404, success: false, message: "Personal section already completed." });
+    // }
+
+    if (user.images.length > 0) {
+      for (const pic of user.images) {
         const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
         await s3Config.send(new DeleteObjectCommand(params));
       }
     }
 
-    user.profilePic = req.files.map((file) => ({
+    user.images = req.files.map((file) => ({
       url: file.location,
       key: file.key,
     }));
 
     await user.save();
-    res.status(200).json({
-      message: "Profile pictures uploaded successfully",
-      profilePics: user.profilePics,
+    res.json({
+      status: 200, success: true, 
+      message: "Images uploaded successfully",
+      images: user.images,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    console.error(error);
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
   }
 };
 
@@ -140,14 +193,12 @@ exports.saveUploadedReel = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     }
 
-    if (user.personalInfoSubmitted) {
-      return res
-        .status(400)
-        .json({ message: "Personal section already completed." });
-    }
+    // if (user.personalInfoSubmitted) {
+    //   return res.json({status: 404, success: false, message: "Personal section already completed." });
+    // }
 
     if (user.shortReel) {
       const params = {
@@ -159,12 +210,14 @@ exports.saveUploadedReel = async (req, res) => {
 
     user.shortReel = { url: req.file.location, key: req.file.key };
     await user.save();
-    res.status(200).json({
+    res.json({
+      status: 200, success: true,
       message: "Short reel uploaded successfully",
       shortReel: user.shortReel,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    console.error(error);
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
   }
 };
 
@@ -173,16 +226,14 @@ exports.updateUserPersonalDetails = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     } else if (user.personalInfoSubmitted) {
-      return res
-        .status(404)
-        .json({ message: "Personal details already added" });
+      return res.json({ status: 404, success: false, message: "Personal details already added" });
     }
 
     user.age = req.body.age;
     user.dateOfBirth = req.body.dateOfBirth;
-    user.gender = req.body.gender; 
+    user.gender = req.body.gender;
     user.hobbies = req.body.hobbies;
     user.location = req.body.location;
     user.interests = req.body.interests;
@@ -193,10 +244,10 @@ exports.updateUserPersonalDetails = async (req, res) => {
 
     await user.save();
 
-    res.json({ message: "Updated successfully" });
+    res.json({ status: 200, success: true, message: "Updated successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ message: "Server Error" });
+    res.status(500).send({ status: 500, success: false, message: "Server Error" });
   }
 };
 
@@ -205,11 +256,9 @@ exports.updateUserProfessinalDetails = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     } else if (user.professionalInfoSubmitted) {
-      return res
-        .status(404)
-        .json({ message: "Professional details already added" });
+      return res.json({ status: 404, success: false, message: "Professional details already added" });
     }
 
     const formData = req.body;
@@ -230,10 +279,10 @@ exports.updateUserProfessinalDetails = async (req, res) => {
 
     await user.save();
 
-    res.json({ message: "Updated successfully" });
+    res.json({ status: 200, success: true, message: "Updated successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ message: "Server Error" });
+    res.status(500).send({ status: 500, success: false, message: "Server Error" });
   }
 };
 
@@ -242,9 +291,9 @@ exports.updateUserPurposeDetails = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     } else if (user.purposeSubmitted) {
-      return res.status(404).json({ message: "purpose already added" });
+      return res.json({ status: 404, success: false, message: "purpose already added" });
     }
 
     user.purpose = req.body.purpose;
@@ -252,10 +301,10 @@ exports.updateUserPurposeDetails = async (req, res) => {
 
     await user.save();
 
-    res.json({ message: "Updated successfully" });
+    res.json({ status: 200, success: true, message: "Updated successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ message: "Server Error" });
+    res.status(500).send({ status: 500, success: false, message: "Server Error" });
   }
 };
 
@@ -263,9 +312,10 @@ exports.CheckRegistrationStatus = async (req, res) => {
   const user = await User.findById(req.user.id);
 
   if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    return res.json({ status: 404, success: false, message: "User not found" });
   } else {
     res.json({
+      status: 200, success: true, message: "Registration status",
       personalInfoSubmitted: user.personalInfoSubmitted,
       professionalInfoSubmitted: user.professionalInfoSubmitted,
       purposeSubmitted: user.purposeSubmitted,
@@ -283,12 +333,12 @@ exports.fetchUserDetails = async (req, res) => {
     );
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.json({ status: 404, success: false, message: "User not found" });
     }
 
-    res.json(user);
+    res.json({ status: 200, success: true, user, message: "User found" });
   } catch (error) {
     console.error("Error fetching user profile", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ status: 500, success: false, message: "Server error" });
   }
 };

@@ -3,6 +3,7 @@ module.exports = (app) => {
 
   var router = require("express").Router();
 
+  router.get("/", authController.test); //test
   router.post("/", authController.test); //test
 
   //Local Login/Register
