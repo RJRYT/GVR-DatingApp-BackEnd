@@ -273,6 +273,7 @@ exports.updateUserProfessinalDetails = async (req, res) => {
       user.professionType = formData.professionType;
     } else if (formData.professionType === "jobseeker") {
       user.expertiseLevel = formData.expertiseLevel;
+      user.jobTitle = formData.jobTitle;
       user.professionalInfoSubmitted = true;
       user.professionType = formData.professionType;
     }

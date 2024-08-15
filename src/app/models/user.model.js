@@ -52,6 +52,7 @@ module.exports = (mongoose) => {
       designation: { type: String },
       jobLocation: { type: String },
       expertiseLevel: { type: String },
+      jobTitle: { type: String },
       purpose: { type: String },
       fake: { type: Boolean },
     },
