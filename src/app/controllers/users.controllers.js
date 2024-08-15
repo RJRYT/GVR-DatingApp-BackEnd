@@ -43,6 +43,7 @@ exports.RefreshToken = async (req, res) => {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: 'None',
       });
 
       res.json({ accessToken });
