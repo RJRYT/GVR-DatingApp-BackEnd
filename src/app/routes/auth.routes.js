@@ -18,7 +18,6 @@ module.exports = (app) => {
 
   //Phone Number Verify
   router.post("/number/sendotp", authController.SendCode);
-  router.post("/number/verifyotp", authController.VerifyCode);
 
   app.use("/api/auth", router);
 };

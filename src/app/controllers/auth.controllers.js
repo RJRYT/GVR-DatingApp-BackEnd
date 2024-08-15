@@ -58,28 +58,40 @@ exports.doLogout = async (req, res) => {
 };
 
 exports.doRegister = async (req, res) => {
-  const { username, email, password, phoneNumber } = req.body;
+  const { username, email, password, phoneNumber, otp } = req.body;
   try {
     let user = await User.findOne({
       $or: [{ email }, { phoneNumber }],
     });
     if (user) return res.status(400).json({ message: "User already exists" });
 
-    user = new User({ username, email, password, phoneNumber });
-    await user.save();
-    const AccessToken = generateAccessToken({ id: user.id });
-    const RefreshToken = generateRefreshToken({ id: user.id });
+    client.verify.v2
+    .services(process.env.TWILIO_SERVICE_SID)
+    .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
+    .then(async (verification_check) => {
+      if (verification_check.status) {
+        user = new User({ username, email, password, phoneNumber });
+        const AccessToken = generateAccessToken({ id: user.id });
+        const RefreshToken = generateRefreshToken({ id: user.id });
 
-    res.cookie("accessToken", AccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-    });
+        res.cookie("accessToken", AccessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+        });
 
-    res.cookie("refreshToken", RefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-    });
-    res.json({ AccessToken });
+        res.cookie("refreshToken", RefreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+        });
+        user.numberVerified = true;
+        await user.save();
+        res.status(200).send({ message: "Registration completed", AccessToken });
+      }
+    })
+    .catch((err) => {
+      console.log("Twilio verify error: ", err);
+      res.status(400).send({ message: "OTP expired/invalid. please generate a new one" });
+    })
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -112,61 +124,15 @@ exports.GoogleCallBack = (req, res) => {
 
 exports.SendCode = async (req, res) => {
   const { phoneNumber } = req.body;
-
-  let user = await User.findOne({ phoneNumber });
-
-  if (!user) {
-    user = new User({ phoneNumber });
-  }
-
-  await user.save();
-
-  try {
-    await client.verify.v2
-      .services(process.env.TWILIO_SERVICE_SID)
-      .verifications.create({ to: `+91${phoneNumber}`, channel: "sms" })
-      .then((verification) => {
-        console.log(verification.sid);
-        res.status(200).send({ message: "OTP sent successfully" });
-      });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Failed to send OTP" });
-  }
-};
-
-exports.VerifyCode = async (req, res) => {
-  const { phoneNumber, otp } = req.body;
-
-  const user = await User.findOne({ phoneNumber });
-  try {
-    if (user) {
-      client.verify.v2
-        .services(process.env.TWILIO_SERVICE_SID)
-        .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
-        .then(async (verification_check) => {
-          if (verification_check.status) {
-            const AccessToken = generateAccessToken({ id: user.id });
-            const RefreshToken = generateRefreshToken({ id: user.id });
-
-            res.cookie("accessToken", AccessToken, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-            });
-
-            res.cookie("refreshToken", RefreshToken, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-            });
-            user.numberVerified = true;
-            await user.save();
-            res.status(200).send({message: "Verification completed", AccessToken });
-          }
-        });
-    } else {
-      res.status(400).send({ message: "Invalid OTP" });
-    }
-  } catch (err) {
-    res.status(400).send({ message: err.message });
-  }
+  client.verify.v2
+    .services(process.env.TWILIO_SERVICE_SID)
+    .verifications.create({ to: `+91${phoneNumber}`, channel: "sms" })
+    .then((verification) => {
+      console.log(verification.sid);
+      res.status(200).send({ message: "OTP sent successfully" });
+    })
+    .catch((error) => {
+      console.log("Twilio sendcode error: ", error);
+      res.status(500).send({ message: "Failed to send OTP" });
+    });
 };
