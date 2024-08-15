@@ -17,7 +17,7 @@ module.exports = (app) => {
   );
 
   router.post(
-    "/upload/profilepics",
+    "/upload/profilepic",
     usersController.authMiddleware,
     usersController.uploadProfilePic.single("profilePic"),
     usersController.saveUploadedPic
