@@ -36,13 +36,13 @@ exports.doLogin = async (req, res) => {
 
     res.cookie("accessToken", AccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: 'None',
     });
 
     res.cookie("refreshToken", RefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: 'None',
     });
 
@@ -78,13 +78,13 @@ exports.doRegister = async (req, res) => {
 
           res.cookie("accessToken", AccessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
             sameSite: 'None',
           });
 
           res.cookie("refreshToken", RefreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
             sameSite: 'None',
           });
           user.numberVerified = true;
@@ -116,13 +116,13 @@ exports.GoogleCallBack = (req, res) => {
 
   res.cookie("accessToken", AccessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: 'None',
   });
 
   res.cookie("refreshToken", RefreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: 'None',
   });
   res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);

@@ -74,11 +74,15 @@ const generateRandomUser = async () => {
       drinkingHabits.map((drnk) => drnk.value)
     ),
     qualification: faker.helpers.arrayElements(qualifications, 2),
-    profilePic: [
+    profilePic: {
+      url: faker.image.avatar(),
+      uploadedAt: faker.date.past(),
+    },
+    images: [
       {
         url: faker.image.avatar(),
         uploadedAt: faker.date.past(),
-      },
+      }
     ],
     shortReel: {
       url: "https://www.example.com/shortreel.mp4",
@@ -91,6 +95,7 @@ const generateRandomUser = async () => {
     ]),
     companyName: faker.company.name(),
     designation: faker.person.jobTitle(),
+    jobTitle: faker.person.jobTitle(),
     jobLocation: faker.helpers.arrayElement(locations.map((loc) => loc.value)),
     expertiseLevel: faker.helpers.arrayElement(
       expertLevel.map((exp) => exp.value)
