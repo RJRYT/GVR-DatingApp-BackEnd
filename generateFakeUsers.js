@@ -1,9 +1,8 @@
 const { faker } = require("@faker-js/faker");
 const fs = require("fs");
 const path = require("path");
-const Schema = require("./src/app/models");
-const User = Schema.user;
-const Preferences = Schema.preferences;
+const connectToDatabase = require("./src/app/config/db.config");
+const { User, Preference } = require("./src/app/models");
 
 const {
   hobbies,
@@ -16,22 +15,9 @@ const {
   gender,
 } = require("./frontend/src/assets/data/Data");
 
-const connectToDatabase = async () => {
-  try {
-    await Schema.mongoose.connect(Schema.url, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log("[Database]: Connected to the database!");
-  } catch (err) {
-    console.error("[Database]: Cannot connect to the database!", err);
-    process.exit(1);
-  }
-};
-
 const deleteFakeUsersAndPreferences = async () => {
   try {
-    await Preferences.deleteMany({ fake: true });
+    await Preference.deleteMany({ fake: true });
     const res = await User.deleteMany({ fake: true });
     console.log(
       "Deleted all fake users and their preferences. Response: ",
@@ -113,7 +99,7 @@ const generateRandomUser = async () => {
 };
 
 const generateRandomUserPreferences = async (userId) => {
-  return new Preferences({
+  return new Preference({
     userId,
     AgeRange: {
       min: faker.number.int({ min: 20, max: 30 }),
@@ -175,7 +161,7 @@ const run = async () => {
   } catch (err) {
     console.error("Error generating user data or preferences:", err);
   } finally {
-    Schema.mongoose.connection.close();
+    connectToDatabase.mongoose.connection.close();
     console.log("Database connection closed.");
   }
 };
