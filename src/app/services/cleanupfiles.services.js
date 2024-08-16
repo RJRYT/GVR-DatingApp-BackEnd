@@ -2,7 +2,7 @@ const {
   ListObjectsV2Command,
   DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
-const User = require("../models").user;
+const { User } = require("../models");
 
 const s3Client = require("../config/aws.config");
 
@@ -43,13 +43,13 @@ async function cleanupUnusedFiles() {
     );
 
     for (const file of unusedFiles) {
-        FileCount++;
-        const deleteParams = {
-            Bucket: process.env.S3_BUCKET,
-            Key: file.Key,
-        };
-        await s3Client.send(new DeleteObjectCommand(deleteParams));
-        console.log(`[Cleanup Files][Deleted]: Key(${FileCount}): ${file.Key}.`);
+      FileCount++;
+      const deleteParams = {
+        Bucket: process.env.S3_BUCKET,
+        Key: file.Key,
+      };
+      await s3Client.send(new DeleteObjectCommand(deleteParams));
+      console.log(`[Cleanup Files][Deleted]: Key(${FileCount}): ${file.Key}.`);
     }
     console.log(`[Cleanup Files]: Task completed.`);
   } catch (err) {

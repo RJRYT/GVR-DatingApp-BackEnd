@@ -1,29 +1,16 @@
-module.exports = (app) => {
-    const usersController = require("../controllers/users.controllers");
-    const matchesController = require("../controllers/matches.controllers");
+const express = require('express');
+const { MatchController } = require("../controllers");
+const { AuthMiddleware } = require("../middlewares");
 
-    var router = require("express").Router();
+const router = express.Router();
 
-    router.get("/", matchesController.test);
-    router.post("/", matchesController.test);
+router.use(AuthMiddleware);
 
-    router.get(
-      "/me",
-      usersController.authMiddleware,
-      matchesController.matchAlgorithm
-    );
+router.get("/", MatchController.test);
+router.post("/", MatchController.test);
 
-    router.get(
-      "/preferences",
-      usersController.authMiddleware,
-      matchesController.viewPreferences
-    );
+router.get("/me", MatchController.matchAlgorithm);
+router.get("/preferences", MatchController.viewPreferences);
+router.post("/preferences", MatchController.modifyPreferences);
 
-    router.post(
-      "/preferences",
-      usersController.authMiddleware,
-      matchesController.modifyPreferences
-    );
-
-    app.use("/api/matches", router);
-};
+module.exports = router;

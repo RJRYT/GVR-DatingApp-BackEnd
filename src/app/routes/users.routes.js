@@ -1,64 +1,65 @@
-module.exports = (app) => {
-  const usersController = require("../controllers/users.controllers");
+const express = require('express');
+const { UserController } = require("../controllers");
+const { AuthMiddleware, UploadMiddleware } = require("../middlewares");
 
-  var router = require("express").Router();
+const router = express.Router();
 
-  router.get("/", usersController.test);
-  router.post("/", usersController.test);
+router.get("/", UserController.test);
+router.post("/", UserController.test);
 
-  router.get("/me", usersController.authMiddleware, usersController.CheckUser);
-  router.post("/token", usersController.RefreshToken);
+router.get("/me", AuthMiddleware, UserController.CheckUser);
 
-  router.post(
-    "/upload/images",
-    usersController.authMiddleware,
-    usersController.uploadImages.array("images", 5),
-    usersController.saveImages
-  );
+router.post("/token", UserController.RefreshToken);
 
-  router.post(
-    "/upload/profilepic",
-    usersController.authMiddleware,
-    usersController.uploadProfilePic.single("profilePic"),
-    usersController.saveUploadedPic
-  );
+router.post(
+  "/upload/images",
+  AuthMiddleware,
+  UploadMiddleware.array("images", 5),
+  UserController.saveImages
+);
 
-  router.post(
-    "/upload/shortreel",
-    usersController.authMiddleware,
-    usersController.uploadReel.single("shortReel"),
-    usersController.saveUploadedReel
-  );
+router.post(
+  "/upload/profilepic",
+  AuthMiddleware,
+  UploadMiddleware.single("profilepic"),
+  UserController.saveUploadedPic
+);
 
-  router.post(
-    "/update/personalinfo",
-    usersController.authMiddleware,
-    usersController.updateUserPersonalDetails
-  );
+router.post(
+  "/upload/shortreel",
+  AuthMiddleware,
+  UploadMiddleware.single("shortreels"),
+  UserController.saveUploadedReel
+);
 
-  router.post(
-    "/update/professionalinfo",
-    usersController.authMiddleware,
-    usersController.updateUserProfessinalDetails
-  );
+router.post(
+  "/update/personalinfo",
+  AuthMiddleware,
+  UserController.updateUserPersonalDetails
+);
 
-  router.post(
-    "/update/purpose",
-    usersController.authMiddleware,
-    usersController.updateUserPurposeDetails
-  );
+router.post(
+  "/update/professionalinfo",
+  AuthMiddleware,
+  UserController.updateUserProfessinalDetails
+);
 
-  router.get(
-    "/status/registration",
-    usersController.authMiddleware,
-    usersController.CheckRegistrationStatus
-  );
+router.post(
+  "/update/purpose",
+  AuthMiddleware,
+  UserController.updateUserPurposeDetails
+);
 
-  router.get(
-    "/profile/:userId",
-    usersController.authMiddleware,
-    usersController.fetchUserDetails
-  );
+router.get(
+  "/status/registration",
+  AuthMiddleware,
+  UserController.CheckRegistrationStatus
+);
 
-  app.use("/api/users", router);
-};
+router.get(
+  "/profile/:userId",
+  AuthMiddleware,
+  UserController.fetchUserDetails
+);
+
+module.exports = router;

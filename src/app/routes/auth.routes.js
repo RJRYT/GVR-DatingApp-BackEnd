@@ -1,24 +1,24 @@
-module.exports = (app) => {
-  const authController = require("../controllers/auth.controllers");
+const express = require('express');
+const { AuthController } = require("../controllers");
 
-  var router = require("express").Router();
+const router = express.Router();
 
-  router.get("/", authController.test); //test
-  router.post("/", authController.test); //test
+//Test route
+router.get("/", AuthController.test);
+router.post("/", AuthController.test);
 
-  //Local Login/Register
-  router.post("/email/login", authController.doLogin);
-  router.post("/email/register", authController.doRegister);
+//Local Login/Register
+router.post("/email/login", AuthController.doLogin);
+router.post("/email/register", AuthController.doRegister);
 
-  //Logout
-  router.post("/logout", authController.doLogout);
+//Logout
+router.post("/logout", AuthController.doLogout);
 
-  // Google Authentication
-  router.get("/google/login", authController.GoogleLogin);
-  router.get("/google/callback", authController.PassportVerify , authController.GoogleCallBack);
+// Google Authentication
+router.get("/google/login", AuthController.GoogleLogin);
+router.get("/google/callback", AuthController.PassportVerify, AuthController.GoogleCallBack);
 
-  //Phone Number Verify
-  router.post("/number/sendotp", authController.SendCode);
+//Phone Number Verify
+router.post("/number/sendotp", AuthController.SendCode);
 
-  app.use("/api/auth", router);
-};
+module.exports = router;
