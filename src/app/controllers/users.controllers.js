@@ -196,21 +196,6 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
   res.json({ status: 200, success: true, message: "Updated successfully" });
 });
 
-exports.CheckRegistrationStatus = CatchAsync(async (req, res) => {
-  const user = await User.findById(req.user.id);
-
-  if (!user) {
-    return res.json({ status: 404, success: false, message: "User not found" });
-  } else {
-    res.json({
-      status: 200, success: true, message: "Registration status",
-      personalInfoSubmitted: user.personalInfoSubmitted,
-      professionalInfoSubmitted: user.professionalInfoSubmitted,
-      purposeSubmitted: user.purposeSubmitted,
-    });
-  }
-});
-
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
   const { userId } = req.params;
 

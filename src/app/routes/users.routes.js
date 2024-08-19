@@ -51,12 +51,6 @@ router.post(
 );
 
 router.get(
-  "/status/registration",
-  AuthMiddleware,
-  UserController.CheckRegistrationStatus
-);
-
-router.get(
   "/profile/:userId",
   AuthMiddleware,
   UserController.fetchUserDetails
