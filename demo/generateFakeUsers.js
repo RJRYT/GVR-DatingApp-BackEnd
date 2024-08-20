@@ -1,8 +1,8 @@
 const { faker } = require("@faker-js/faker");
 const fs = require("fs");
 const path = require("path");
-const connectToDatabase = require("./src/app/config/db.config");
-const { User, Preference } = require("./src/app/models");
+const connectToDatabase = require("../src/app/config/db.config");
+const { User, Preference } = require("../src/app/models");
 
 const {
   hobbies,
@@ -13,7 +13,7 @@ const {
   expertLevel,
   locations,
   gender,
-} = require("./frontend/src/assets/data/Data");
+} = require("./Data");
 
 const deleteFakeUsersAndPreferences = async () => {
   try {
@@ -161,8 +161,8 @@ const run = async () => {
   } catch (err) {
     console.error("Error generating user data or preferences:", err);
   } finally {
-    connectToDatabase.mongoose.connection.close();
     console.log("Database connection closed.");
+    process.exit();
   }
 };
 
