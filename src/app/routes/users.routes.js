@@ -39,6 +39,12 @@ router.post(
 );
 
 router.post(
+  "/update/personalinfo/v2",
+  AuthMiddleware,
+  UserController.addUserProfileInfo
+);
+
+router.post(
   "/update/professionalinfo",
   AuthMiddleware,
   UserController.updateUserProfessinalDetails
