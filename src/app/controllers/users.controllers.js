@@ -220,62 +220,51 @@ exports.addUserProfileInfo = CatchAsync(async (req, res) => {
     return res.json({ status: 404, success: false, message: "Personal details already added. upload cancelled" });
   }
 
-  const fileUpload = UploadMiddleware.fields([
-    { name: 'images', maxCount: 5 },
-    { name: 'profilepic', maxCount: 1 },
-    { name: 'shortreels', maxCount: 1 }
-  ]);
-  fileUpload(req, res, async (err) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ status: 500, success: false, message: 'An error occurred' });
-    }
-    //Delete existing profile pic if any
-    if (user.profilePic && user.profilePic.key) {
-      const params = {
-        Bucket: process.env.S3_BUCKET,
-        Key: user.profilePic.key,
-      };
-      await s3Config.send(new DeleteObjectCommand(params));
-    }
-    //Delete existing images if any
-    if (user.images && user.images.length > 0) {
-      for (const pic of user.images) {
-        if (pic.key) {
-          const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
-          await s3Config.send(new DeleteObjectCommand(params));
-        }
+  //Delete existing profile pic if any
+  if (user.profilePic && user.profilePic.key) {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: user.profilePic.key,
+    };
+    await s3Config.send(new DeleteObjectCommand(params));
+  }
+  //Delete existing images if any
+  if (user.images && user.images.length > 0) {
+    for (const pic of user.images) {
+      if (pic.key) {
+        const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
+        await s3Config.send(new DeleteObjectCommand(params));
       }
     }
-    //Delete existing shortreel if any
-    if (user.shortReel && user.shortReel.key) {
-      const params = {
-        Bucket: process.env.S3_BUCKET,
-        Key: user.shortReel.key,
-      };
-      await s3Config.send(new DeleteObjectCommand(params));
-    }
-    //Saving uploaded files to user
-    user.shortReel = { url: req.files.shortreels.location, key: req.files.shortreels.key };
-    user.images = req.files.images.map((file) => ({
-      url: file.location,
-      key: file.key,
-    }));
-    user.profilePic = { url: req.files.profilepic.location, key: req.files.profilepic.key };
+  }
+  //Delete existing shortreel if any
+  if (user.shortReel && user.shortReel.key) {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: user.shortReel.key,
+    };
+    await s3Config.send(new DeleteObjectCommand(params));
+  }
+  //Saving uploaded files to user
+  user.shortReel = { url: req.files.shortreels.location, key: req.files.shortreels.key };
+  user.images = req.files.images.map((file) => ({
+    url: file.location,
+    key: file.key,
+  }));
+  user.profilePic = { url: req.files.profilepic.location, key: req.files.profilepic.key };
 
-    //saving other values
-    user.age = req.body.age;
-    user.dateOfBirth = req.body.dateOfBirth;
-    user.gender = req.body.gender;
-    user.hobbies = req.body.hobbies;
-    user.location = req.body.location;
-    user.interests = req.body.interests;
-    user.smokingHabits = req.body.smokingHabits;
-    user.drinkingHabits = req.body.drinkingHabits;
-    user.qualification = req.body.qualification;
-    user.personalInfoSubmitted = true;
+  //saving other values
+  user.age = req.body.age;
+  user.dateOfBirth = req.body.dateOfBirth;
+  user.gender = req.body.gender;
+  user.hobbies = JSON.parse(req.body.hobbies);
+  user.location = req.body.location;
+  user.interests = JSON.parse(req.body.interests);
+  user.smokingHabits = req.body.smokingHabits;
+  user.drinkingHabits = req.body.drinkingHabits;
+  user.qualification = JSON.parse(req.body.qualification);
+  user.personalInfoSubmitted = true;
 
-    await user.save();
-    return res.json({ status: 200, success: true, message: "Upload done", user });
-  });
+  await user.save();
+  return res.json({ status: 200, success: true, message: "Upload done", user });
 });
