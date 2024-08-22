@@ -5,6 +5,7 @@ const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { generateAccessToken } = require("../services").Token;
 const CatchAsync = require("../util/catchAsync");
 const { UploadMiddleware } = require("../middlewares");
+const bcrypt = require("bcryptjs");
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from users" });
@@ -198,6 +199,7 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
 });
 
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
+ console.log('hello...........')
   const { userId } = req.params;
 
   const user = await User.findById(
