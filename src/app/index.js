@@ -64,5 +64,4 @@ process.on("uncaughtException", (err, origin) => {
   console.log("[uncaughtException]: ", origin, err);
 });
 
-
 module.exports = app;
