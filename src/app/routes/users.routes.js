@@ -52,4 +52,7 @@ router.put(
   UserController.changePassword
 );
 
+router.post("/notification/markread", AuthMiddleware, UserController.MarkNotificationAsRead);
+router.post("/notification/delete", AuthMiddleware, UserController.deleteNotification);
+
 module.exports = router;

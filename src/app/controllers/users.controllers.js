@@ -194,9 +194,30 @@ exports.changePassword = CatchAsync(async (req, res) => {
       return res.json({ status: 400, success: false, message: 'Current password is incorrect' });
     }
   }
-  
+
   user.password = newPassword;
   await user.save();
 
   res.json({ status: 200, success: true, message: "Password updated successfully" });
+});
+
+exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
+  const { userId, notificationId } = req.body;
+
+  await User.updateOne(
+    { _id: userId, 'notifications._id': notificationId },
+    { $set: { 'notifications.$.read': true } }
+  );
+
+  res.status(200).json({ success: true });
+});
+
+exports.deleteNotification = CatchAsync(async(req, res)=>{
+  const { userId, notificationId } = req.body;
+
+  await User.deleteOne(
+    { _id: userId, 'notifications._id': notificationId }
+  );
+
+  res.status(200).json({ success: true });
 });

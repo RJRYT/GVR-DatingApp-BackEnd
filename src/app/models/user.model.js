@@ -19,6 +19,14 @@ const ShortReelSchema = mongoose.Schema({
   uploadedAt: { type: Date, default: Date.now },
 });
 
+const notificationSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  message: { type: String, required: true },
+  from: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  read: { type: Boolean, default: false },
+  timestamp: { type: Date, default: Date.now },
+});
+
 const UserSchema = mongoose.Schema(
   {
     firstName: { type: String },
@@ -54,6 +62,9 @@ const UserSchema = mongoose.Schema(
     expertiseLevel: { type: String },
     jobTitle: { type: String },
     purpose: { type: String },
+    notifications: [notificationSchema],
+    isOnline: { type: Boolean, default: false },
+    lastActive: { type: Date, default: Date.now },
     fake: { type: Boolean },
   },
   { timestamps: true }
