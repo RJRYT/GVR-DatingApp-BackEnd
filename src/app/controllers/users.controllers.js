@@ -214,9 +214,12 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 
 
 exports.checkPassword=CatchAsync(async(req,res) =>{
-console.log("hello...........")
+
 const userId=req.user.id
-const user=await User.findById(userId, password)
+
+// Find the user by ID and explicitly include the password field in the projection
+const user=await User.findById(userId, 'password')
+console.log(user,"user")
 if (!user) {
   return res.status(404).json({ success: false, message: "User not found" });
 }
