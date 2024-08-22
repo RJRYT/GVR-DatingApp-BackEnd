@@ -12,41 +12,14 @@ router.get("/me", AuthMiddleware, UserController.CheckUser);
 router.post("/token", UserController.RefreshToken);
 
 router.post(
-  "/upload/images",
-  AuthMiddleware,
-  UploadMiddleware.array("images", 5),
-  UserController.saveImages
-);
-
-router.post(
-  "/upload/profilepic",
-  AuthMiddleware,
-  UploadMiddleware.single("profilepic"),
-  UserController.saveUploadedPic
-);
-
-router.post(
-  "/upload/shortreel",
-  AuthMiddleware,
-  UploadMiddleware.single("shortreels"),
-  UserController.saveUploadedReel
-);
-
-router.post(
   "/update/personalinfo",
-  AuthMiddleware,
-  UserController.updateUserPersonalDetails
-);
-
-router.post(
-  "/update/personalinfo/v2",
   AuthMiddleware,
   UploadMiddleware.fields([
     { name: 'images', maxCount: 5 },
     { name: 'profilepic', maxCount: 1 },
     { name: 'shortreels', maxCount: 1 }
   ]),
-  UserController.addUserProfileInfo
+  UserController.updateUserPersonalDetails
 );
 
 router.post(
@@ -68,13 +41,13 @@ router.get(
 );
 
 router.get(
-  "/checkPass",
+  "/password/check",
   AuthMiddleware,
   UserController.checkPassword
 );
 
 router.put(
-  '/change-password',
+  '/password/change',
   AuthMiddleware,
   UserController.changePassword
 );
