@@ -203,24 +203,32 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 
   const user = await User.findById(
     userId,
-    "username password age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
+    "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
   );
 
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
- // Check if the password exists
- const hasPassword = !!user.password;
-
   res.json({ status: 200, success: true, user,hasPassword, message: "User found" });
 });
 
+
+exports.checkPassword=CatchAsync(async(req,res) =>{
+console.log("hello...........")
+const userId=req.user.id
+const user=await User.findById(userId, password)
+if (!user) {
+  return res.status(404).json({ success: false, message: "User not found" });
+}
+
+// Check if the password exists
+const hasPassword = !!user.password;
+
+res.status(200).json({ success: true, user, hasPassword, message: "User found" });
+})
+
 exports.changePassword = CatchAsync(async (req, res) => {
-  console.log('Request received at change-password');
-  console.log('User:', req.user);
-  console.log('Body:', req.body);
   const userId = req.user.id;
-  console.log(userId);
   
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
@@ -230,9 +238,7 @@ exports.changePassword = CatchAsync(async (req, res) => {
   }
 
     // Fetch the user from the database
-    const user = await User.findById(userId);
-    console.log(user,"}}}}}}}}}}");
-    
+    const user = await User.findById(userId);   
 
   // Check if the new password and confirm password match
   if (newPassword !== confirmPassword) {
