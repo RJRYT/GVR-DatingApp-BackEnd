@@ -56,4 +56,10 @@ router.get(
   UserController.fetchUserDetails
 );
 
+router.put(
+  '/change-password',
+  AuthMiddleware,
+  UserController.changePassword
+);
+
 module.exports = router;

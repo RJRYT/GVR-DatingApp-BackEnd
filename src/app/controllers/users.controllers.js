@@ -4,6 +4,7 @@ const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { generateAccessToken } = require("../services").Token;
 const CatchAsync = require("../util/catchAsync");
+const bcrypt = require("bcryptjs");
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from users" });
@@ -197,16 +198,60 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
 });
 
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
+ console.log('hello...........')
   const { userId } = req.params;
 
   const user = await User.findById(
     userId,
-    "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
+    "username password age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
   );
 
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
+ // Check if the password exists
+ const hasPassword = !!user.password;
 
-  res.json({ status: 200, success: true, user, message: "User found" });
+  res.json({ status: 200, success: true, user,hasPassword, message: "User found" });
+});
+
+exports.changePassword = CatchAsync(async (req, res) => {
+  console.log('Request received at change-password');
+  console.log('User:', req.user);
+  console.log('Body:', req.body);
+  const userId = req.user.id;
+  console.log(userId);
+  
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+
+  if (!req.user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+    // Fetch the user from the database
+    const user = await User.findById(userId);
+    console.log(user,"}}}}}}}}}}");
+    
+
+  // Check if the new password and confirm password match
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ success: false, message: "Passwords do not match" });
+  }
+   
+    // Check if the user has a current password and if it is correct
+    if (user.password) {
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
+    }
+  // Hash the new password and update it in the database
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
+  user.password= hashedPassword;
+  // Save the updated user
+  await user.save();
+
+  res.status(200).json({ success: true, message: "Password updated successfully" });
 });
