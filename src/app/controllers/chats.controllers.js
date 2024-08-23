@@ -1,4 +1,4 @@
-const { User, ChatRequests, PrivateChat, GroupChat } = require("../models");
+const { User, ChatRequests, PrivateChat, GroupChat, PrivateMessages, GroupMessages } = require("../models");
 const CatchAsync = require("../util/catchAsync");
 
 exports.test = (req, res) => {
@@ -7,6 +7,9 @@ exports.test = (req, res) => {
 
 exports.privateChatRequests = CatchAsync(async (req, res) => {
   const { recipientId } = req.body;
+
+  const requestCheck = await ChatRequests.findOne({ sender: req.user.id, recipient: recipientId });
+  if (requestCheck) return res.json({ status: 401, success: false, message: "Request already on pending list" });
 
   const recipient = await User.findById(recipientId);
 
@@ -21,15 +24,15 @@ exports.privateChatRequests = CatchAsync(async (req, res) => {
 
   const request = new ChatRequests({ sender: req.user.id, recipient: recipientId });
   await request.save();
-  res.status(201).json(request);
+  res.json({ status: 200, success: true, message: "Request sended", request });
 });
 
 exports.respondToChatRequests = CatchAsync(async (req, res) => {
   const { status } = req.body;  // 'accepted' or 'declined'
   const request = await PrivateChatRequest.findById(req.params.id);
 
-  if (!request) return res.status(404).send('Request not found');
-  if (request.recipient.toString() !== req.user.id) return res.status(403).send('Unauthorized');
+  if (!request) return res.json({ status: 401, success: false, message: 'Request not found' });
+  if (request.recipient.toString() !== req.user.id) return res.json({ status: 403, success: false, message: 'Unauthorized' });
 
   request.status = status;
   await request.save();
@@ -48,9 +51,9 @@ exports.respondToChatRequests = CatchAsync(async (req, res) => {
   if (status === 'accepted') {
     let chat = new PrivateChat({ participants: [request.sender, request.recipient] });
     await chat.save();
-    res.status(201).json(chat);
+    res.json({ status: 201, success: true, message: "Request accepted", chat });
   } else {
-    res.status(200).json(request);
+    res.json({ status: 200, success: true, message: "Request declined" });
   }
 });
 
@@ -58,15 +61,15 @@ exports.createGroupChat = CatchAsync(async (req, res) => {
   const { name, description } = req.body;
   const groupChat = new GroupChat({ name, description, admin: req.user.id, members: [req.user.id] });
   await groupChat.save();
-  res.status(201).json(groupChat);
+  res.json({ status: 200, success: true, message: "Group created", group: groupChat });
 });
 
 exports.inviteToGroupChat = CatchAsync(async (req, res) => {
   const { userId } = req.body;
   const groupChat = await GroupChat.findById(req.params.groupId);
 
-  if (!groupChat) return res.status(404).send('Group chat not found');
-  if (groupChat.admin.toString() !== req.user.id) return res.status(403).send('Unauthorized');
+  if (!groupChat) return res.json({ status: 404, success: false, message: 'Group chat not found' });
+  if (groupChat.admin.toString() !== req.user.id) return res.json({ status: 403, success: false, message: 'Unauthorized' });
 
   groupChat.invitations.push(userId);
   await groupChat.save();
@@ -82,17 +85,17 @@ exports.inviteToGroupChat = CatchAsync(async (req, res) => {
   invitee.notifications.push(notification);
   await invitee.save();
 
-  res.status(200).json(groupChat);
+  res.json({ status: 200, success: true, message: "Invite sended successfully" });
 });
 
 exports.respondToGroupInvite = CatchAsync(async (req, res) => {
   const { status } = req.body;  // 'accepted' or 'declined'
   const groupChat = await GroupChat.findById(req.params.groupId);
 
-  if (!groupChat) return res.status(404).send('Group chat not found');
+  if (!groupChat) return res.json({ status: 404, success: false, message: 'Group chat not found' });
 
   const invitationIndex = groupChat.invitations.indexOf(req.user.id);
-  if (invitationIndex === -1) return res.status(400).send('No invitation found');
+  if (invitationIndex === -1) return res.json({ status: 400, success: false, message: 'No invitation found' });
 
   if (status === 'accepted') {
     groupChat.members.push(req.user.id);
@@ -110,16 +113,16 @@ exports.respondToGroupInvite = CatchAsync(async (req, res) => {
   admin.notifications.push(notification);
   await admin.save();
 
-  res.status(200).json(groupChat);
+  res.json({ status: 200, success: true, message: `Group invitation ${status}` });
 });
 
 exports.leaveFromGroup = CatchAsync(async (req, res) => {
   const groupChat = await GroupChat.findById(req.params.groupId);
 
-  if (!groupChat) return res.status(404).send('Group chat not found');
+  if (!groupChat) return res.json({ status: 404, success: false, message: 'Group chat not found' });
 
   const memberIndex = groupChat.members.indexOf(req.user.id);
-  if (memberIndex === -1) return res.status(400).send('You are not a member of this group');
+  if (memberIndex === -1) return res.json({ status: 400, success: false, message: 'You are not a member of this group' });
 
   groupChat.members.splice(memberIndex, 1);
   if (groupChat.members.length === 0) {
@@ -138,15 +141,46 @@ exports.leaveFromGroup = CatchAsync(async (req, res) => {
   admin.notifications.push(notification);
   await admin.save();
 
-  res.status(200).json(groupChat);
+  res.json({ status: 200, success: true, message: "You leaved from this group" });
 });
 
 exports.fetchPrivateMessages = CatchAsync(async (req, res) => {
   const chat = await PrivateChat.findById(req.params.chatId).populate('messages');
-  res.json(chat.messages);
+  res.json({ status: 200, success: true, message: "Your chats", chats: chat.messages });
 });
 
 exports.fetchGroupMessages = CatchAsync(async (req, res) => {
   const chat = await GroupChat.findById(req.params.chatId).populate('messages');
-  res.json(chat.messages);
+  res.json({ status: 200, success: true, message: "Your chats", chats: chat.messages });
 });
+
+exports.fetchChats = CatchAsync(async (req, res) => {
+  const userId = req.user.id;
+
+  const chats = await PrivateChat.find({ participants: userId })
+    .populate('participants', 'username profilePic');
+
+  const formattedChats = await Promise.all(chats.map(async chat => {
+    const otherParticipant = chat.participants.find(p => p._id.toString() !== userId.toString());
+
+    const lastMessage = await PrivateMessages.findOne({ chatRoom: chat._id })
+      .sort({ timestamp: -1 })
+      .lean();
+
+    return {
+      chatId: chat._id,
+      user: {
+        _id: otherParticipant._id,
+        username: otherParticipant.username,
+        profilePic: otherParticipant.profilePic,
+      },
+      lastMessage: {
+        text: lastMessage ? lastMessage.text : "No messages yet",
+        read: lastMessage ? lastMessage.read : true,
+        timestamp: lastMessage ? lastMessage.createdAt : null,
+      },
+    };
+  }));
+
+  res.json({ status: 200, success: true, message: "Your chats list", chats: formattedChats });
+})

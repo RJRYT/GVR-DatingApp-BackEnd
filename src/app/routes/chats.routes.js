@@ -9,6 +9,8 @@ router.use(AuthMiddleware);
 router.get("/", ChatController.test);
 router.post("/", ChatController.test);
 
+router.get("/list", ChatController.fetchChats);
+
 router.post("/requests", ChatController.privateChatRequests);
 router.post("/requests/:id/respond", ChatController.respondToChatRequests);
 
