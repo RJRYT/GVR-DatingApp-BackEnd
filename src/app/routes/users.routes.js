@@ -56,4 +56,10 @@ router.get(
   UserController.fetchUserDetails
 );
 
+router.get(
+  "/users",
+  UserController.fetchUserListing
+);
+
+
 module.exports = router;
