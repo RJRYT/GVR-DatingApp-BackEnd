@@ -7,7 +7,7 @@ const morgan = require("morgan");
 const app = express();
 const middleware = require("./middlewares");
 
-const { CleanupFiles } = require("./services");
+const { CleanupFiles, SocketIo } = require("./services");
 const corsConfig = middleware.CorsMiddleware;
 const passport = middleware.PassportMiddleware;
 const { GlobalErrorMiddleware } = middleware.ErrorMiddleware
@@ -64,7 +64,14 @@ process.on("uncaughtException", (err, origin) => {
   console.log("[uncaughtException]: ", origin, err);
 });
 
+// Socket.io config
+const server = require('http').createServer(app);
+const io = require('socket.io')(server, {
+    cors: corsConfig
+});
 
+SocketIo(io);
 
+app.set("socketio", io);
 
-module.exports = app;
+module.exports = server;

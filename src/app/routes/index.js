@@ -3,6 +3,7 @@ const { NotFoundMiddleware } = require("../middlewares/error.middleware");
 const AuthRoutes = require("./auth.routes");
 const MatchesRoutes = require("./matches.routes");
 const UsersRoutes = require("./users.routes");
+const ChatRoutes = require("./chats.routes");
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.get(["/", "/api"], (req, res) => {
 router.use("/api/auth", AuthRoutes);
 router.use("/api/matches", MatchesRoutes);
 router.use("/api/users", UsersRoutes);
+router.use("/api/chats", ChatRoutes);
 
 // Notfound handling
 router.use(NotFoundMiddleware);
