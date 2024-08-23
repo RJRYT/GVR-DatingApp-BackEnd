@@ -55,4 +55,10 @@ router.put(
 router.post("/notification/markread", AuthMiddleware, UserController.MarkNotificationAsRead);
 router.post("/notification/delete", AuthMiddleware, UserController.deleteNotification);
 
+router.get(
+  "/users",
+  UserController.fetchUserListing
+);
+
+
 module.exports = router;

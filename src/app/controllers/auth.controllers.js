@@ -134,3 +134,4 @@ exports.SendCode = CatchAsync(async (req, res) => {
       res.status(500).send({ status: 200, success: false, message: "Failed to send OTP" });
     });
 });
+
