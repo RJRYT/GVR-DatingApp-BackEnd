@@ -10,7 +10,7 @@ router.get("/", MatchController.test);
 router.post("/", MatchController.test);
 
 router.get("/me", MatchController.matchAlgorithm);
-router.get("/preferences", MatchController.viewPreferences);
+router.get("/preferences/:userId", MatchController.viewPreferences);
 router.post("/preferences", MatchController.modifyPreferences);
 
 module.exports = router;

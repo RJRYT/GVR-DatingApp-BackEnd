@@ -3,7 +3,6 @@ const { NotFoundMiddleware } = require("../middlewares/error.middleware");
 const AuthRoutes = require("./auth.routes");
 const MatchesRoutes = require("./matches.routes");
 const UsersRoutes = require("./users.routes");
-const NotificationRoutes = require("./notifications.routes")
 
 const router = express.Router();
 
