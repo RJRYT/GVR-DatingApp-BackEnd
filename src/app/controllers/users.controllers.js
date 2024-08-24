@@ -221,19 +221,3 @@ exports.deleteNotification = CatchAsync(async(req, res)=>{
 
   res.status(200).json({ success: true });
 });
-
-exports.fetchUserListing = CatchAsync(async (req, res) => {
-  // const { userId } = req.params;
-  try {
-    console.log("Reached API user");
-    const users = await User.find();
-    console.log(users);
-    return res.json(users);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return res.status(500).json({ message: "Server error while fetching users" });
-  }
- 
-});
-
-

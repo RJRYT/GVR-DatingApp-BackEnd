@@ -46,7 +46,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
   // Find users that match the preferences
   const matches = await User.find(
     matchingQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -140,5 +140,66 @@ exports.viewPreferences = CatchAsync(async (req, res) => {
   }
 
   res.json({ status: 200, success: true, preferences });
+});
+
+exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { page = 1, limit = 10, filter = "" } = req.query;
+  const preferences = await Preference.findOne({ userId });
+  const user = await User.findById(userId);
+  let fetchQuery = {
+    _id: { $ne: userId },
+    personalInfoSubmitted: true,
+    professionalInfoSubmitted: true,
+    purposeSubmitted: true
+  };
+  if (filter) {
+    switch (filter) {
+      case "nearby": {
+        fetchQuery.location = user.location;
+        break;
+      }
+      case "qualification": {
+        if (preferences?.Education && preferences?.Education?.length) {
+          fetchQuery["qualification.value"] = { $in: preferences.Education.map((edu)=>edu.value) };
+        } else {
+          fetchQuery.qualification = user.qualification;
+        }
+        break;
+      }
+      case "interests": {
+        if (preferences?.Education && preferences?.Education?.length) {
+          fetchQuery["interests.value"] = { $in: preferences.Interests.map((intrst)=>intrst.value) };
+        } else {
+          fetchQuery.interests = user.interests;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  
+  // Find users that match the preferences
+  const matches = await User.find(
+    fetchQuery,
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+  )
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .exec();
+
+  // Get total matching users count
+  const count = await User.countDocuments(fetchQuery);
+
+  res.json({
+    status: 200,
+    success: true,
+    message: "filtered matches",
+    matches,
+    totalmatches: count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: page,
+  });
 });
 
