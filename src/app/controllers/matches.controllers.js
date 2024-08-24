@@ -83,7 +83,7 @@ exports.modifyPreferences = CatchAsync(async (req, res) => {
   } = req.body;
 
   // Validation for AgeRange and Location
-  if (!AgeRange || !AgeRange.min || !AgeRange.max || !Location) {
+  if (!AgeRange || !AgeRange.min || !AgeRange.max || !Location.length) {
     return res.json({ status: 400, success: false, message: "AgeRange and Location are required." });
   }
 
@@ -96,14 +96,14 @@ exports.modifyPreferences = CatchAsync(async (req, res) => {
     preferences.HeightRange = HeightRange;
     preferences.WeightRange = WeightRange;
     preferences.Location = Location;
-    preferences.Interests = Interests || [];
-    preferences.Hobbies = Hobbies || [];
-    preferences.Education = Education || [];
-    preferences.Gender = Gender || "";
-    preferences.Religion = Religion || {} ;
-    preferences.Relation = Relation ? Relation.value : "";
-    preferences.Occupation = Occupation ? Occupation.value : "";
-    preferences.LifeStyle = LifeStyle || [];
+    preferences.Interests = Interests;
+    preferences.Hobbies = Hobbies;
+    preferences.Education = Education;
+    preferences.Gender = Gender;
+    preferences.Religion = Religion;
+    preferences.Relation = Relation;
+    preferences.Occupation = Occupation;
+    preferences.LifeStyle = LifeStyle;
 
     await preferences.save();
   } else {
@@ -117,11 +117,11 @@ exports.modifyPreferences = CatchAsync(async (req, res) => {
       Interests,
       Hobbies,
       Education,
-      Gender: Gender || "",
-      Religion: Religion || {},
-      Relation: Relation ? Relation.value : "",
-      Occupation: Occupation ? Occupation.value : "",
-      LifeStyle: LifeStyle || []
+      Gender,
+      Religion,
+      Relation,
+      Occupation,
+      LifeStyle
     });
 
     await preferences.save();

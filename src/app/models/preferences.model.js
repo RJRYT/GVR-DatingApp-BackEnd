@@ -6,39 +6,18 @@ const PreferencesSchema = mongoose.Schema({
     ref: "User",
     required: true,
   },
-  AgeRange: {
-    min: { type: Number, required: true },
-    max: { type: Number, required: true },
-  },
-  HeightRange: {
-    min: { type: Number, required: true },
-    max: { type: Number, required: true },
-  },
-  WeightRange: {
-    min: { type: Number, required: true },
-    max: { type: Number, required: true },
-  },
+  AgeRange: { min: Number, max: Number },
+  HeightRange: { min: Number, max: Number },
+  WeightRange: { min: Number, max: Number },
   Location: [{ label: String, value: String }],
-  Interests:  [{ label: String, value: String }],
-  Hobbies:  [{ label: String, value: String }],
-  Education:  [{ label: String, value: String }],
-  Religion: {
-    value: { type: String, required: true },
-    label: { type: String, required: true },
-  },
-  Gender: {
-    value: { type: String, required: true },
-    label: { type: String, required: true },
-  },
-  Occupation:  {
-    value: { type: String, required: true },
-    label: { type: String, required: true },
-  },
-  LifeStyle:  [{ label: String, value: String }],
-  Relation: {
-    value: { type: String, required: true },
-    label: { type: String, required: true },
-  },
+  Interests: [{ label: String, value: String }],
+  Hobbies: [{ label: String, value: String }],
+  Education: [{ label: String, value: String }],
+  Religion: { label: String, value: String },
+  Gender: { label: String, value: String },
+  Occupation: { label: String, value: String },
+  LifeStyle: [{ label: String, value: String }],
+  Relation: { label: String, value: String },
   fake: { type: Boolean },
 });
 
