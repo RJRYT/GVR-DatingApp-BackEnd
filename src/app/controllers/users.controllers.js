@@ -310,7 +310,7 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
       return res.json({
         status: 401,
         success: false,
-        message: "Request already on pending list",
+        message: "Request already on his pending list",
       });
     }
     if (requestCheck.status === "accepted") {
@@ -335,6 +335,36 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
         success: true,
         message: "Request sended",
         request: requestCheck,
+      });
+    }
+  }
+
+  const requestReverseCheck = await FriendRequests.findOne({
+    sender: recipientId,
+    recipient: req.user.id,
+  });
+
+  if (requestReverseCheck) {
+    if (requestReverseCheck.status === "pending") {
+      return res.json({
+        status: 401,
+        success: false,
+        message: "His request is on your pending list. please proceed with it.",
+      });
+    }
+    if (requestReverseCheck.status === "accepted") {
+      return res.json({
+        status: 401,
+        success: false,
+        message: "He is already your friend",
+      });
+    }
+    if (requestReverseCheck.status === "declined") {
+      return res.json({
+        status: 401,
+        success: false,
+        message:
+          "His request is already declined by you. You can't send request",
       });
     }
   }
@@ -377,8 +407,25 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
       message: "Request already accepted",
     });
 
+  if (request.status !== "pending")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request is not on pending to accept",
+    });
+
   request.status = "accepted";
   await request.save();
+
+  const requestReverseCheck = await FriendRequests.findOne({
+    sender: request.recipient,
+    recipient: request.sender,
+  });
+
+  if (requestReverseCheck) {
+    requestReverseCheck.status = "accepted";
+    await requestReverseCheck.save();
+  }
 
   let chat = new PrivateChat({
     participants: [request.sender, request.recipient],
@@ -390,7 +437,7 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
 
   sender.friends.push(request.recipient);
   recipient.friends.push(request.sender);
-  
+
   const notification = {
     type: "requestAccepted",
     message: `${req.user.username} accepted your friend request`,
@@ -420,6 +467,13 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
       status: 400,
       success: false,
       message: "Request already declined",
+    });
+
+  if (request.status !== "pending")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request is not on pending to decline",
     });
 
   request.status = "declined";
@@ -454,6 +508,13 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
       status: 400,
       success: false,
       message: "Request already cancelled",
+    });
+
+  if (request.status !== "pending")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request is not on pending to cancel",
     });
 
   request.status = "cancelled";
