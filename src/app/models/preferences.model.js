@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const PreferencesSchema = mongoose.Schema({
   userId: {
@@ -18,8 +18,6 @@ const PreferencesSchema = mongoose.Schema({
   Occupation: { label: String, value: String },
   LifeStyle: [{ label: String, value: String }],
   Relation: { label: String, value: String },
-  fake: { type: Boolean },
 });
-
 
 module.exports = mongoose.model("Preferences", PreferencesSchema);
