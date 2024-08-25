@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 const { ChatController } = require("../controllers");
 const { AuthMiddleware } = require("../middlewares");
 
@@ -10,9 +10,6 @@ router.get("/", ChatController.test);
 router.post("/", ChatController.test);
 
 router.get("/list", ChatController.fetchChats);
-
-router.post("/requests", ChatController.privateChatRequests);
-router.post("/requests/:id/respond", ChatController.respondToChatRequests);
 
 router.post("/groups/create", ChatController.createGroupChat);
 router.post("/groups/:groupId/invite", ChatController.inviteToGroupChat);

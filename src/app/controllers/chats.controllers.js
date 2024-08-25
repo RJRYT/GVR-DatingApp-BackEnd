@@ -1,61 +1,9 @@
-const { User, ChatRequests, PrivateChat, GroupChat, PrivateMessages, GroupMessages } = require("../models");
+const { User, ChatRequests, PrivateChat, GroupChat, PrivateMessages } = require("../models");
 const CatchAsync = require("../util/catchAsync");
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from chats" });
 };
-
-exports.privateChatRequests = CatchAsync(async (req, res) => {
-  const { recipientId } = req.body;
-
-  const requestCheck = await ChatRequests.findOne({ sender: req.user.id, recipient: recipientId });
-  if (requestCheck) return res.json({ status: 401, success: false, message: "Request already on pending list" });
-
-  const recipient = await User.findById(recipientId);
-
-  // Add a new notification to the recipient's notifications array
-  const notification = {
-    type: 'MessageRequest',
-    message: `You have a new message request from ${req.user.username}`,
-    from: req.user.id,
-  };
-  recipient.notifications.push(notification);
-  await recipient.save();
-
-  const request = new ChatRequests({ sender: req.user.id, recipient: recipientId });
-  await request.save();
-  res.json({ status: 200, success: true, message: "Request sended", request });
-});
-
-exports.respondToChatRequests = CatchAsync(async (req, res) => {
-  const { status } = req.body;  // 'accepted' or 'declined'
-  const request = await PrivateChatRequest.findById(req.params.id);
-
-  if (!request) return res.json({ status: 401, success: false, message: 'Request not found' });
-  if (request.recipient.toString() !== req.user.id) return res.json({ status: 403, success: false, message: 'Unauthorized' });
-
-  request.status = status;
-  await request.save();
-
-  const sender = await User.findById(request.sender);
-
-  // Notify the sender that their chat request was accepted
-  const notification = {
-    type: `${status === 'accepted' ? "messageAccepted" : "messageDeclined"}`,
-    message: `${req.user.username} ${status} your message request`,
-    from: recipientId,
-  };
-  sender.notifications.push(notification);
-  await sender.save();
-
-  if (status === 'accepted') {
-    let chat = new PrivateChat({ participants: [request.sender, request.recipient] });
-    await chat.save();
-    res.json({ status: 201, success: true, message: "Request accepted", chat });
-  } else {
-    res.json({ status: 200, success: true, message: "Request declined" });
-  }
-});
 
 exports.createGroupChat = CatchAsync(async (req, res) => {
   const { name, description } = req.body;

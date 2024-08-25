@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User, FriendRequests, PrivateChat } = require("../models");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
@@ -13,23 +13,35 @@ exports.test = (req, res) => {
 exports.RefreshToken = CatchAsync(async (req, res) => {
   const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
   if (!refreshToken) {
-    return res.status(403).json({ status: 403, success: false, message: "Refresh token not found" });
+    return res.status(403).json({
+      status: 403,
+      success: false,
+      message: "Refresh token not found",
+    });
   }
 
   jwt.verify(
     refreshToken,
     process.env.JWT_REFRESH_TOKEN_SECRET,
     (err, user) => {
-      if (err) return res.status(403).json({ status: 403, success: false, message: "Server error" });
+      if (err)
+        return res
+          .status(403)
+          .json({ status: 403, success: false, message: "Server error" });
 
       const accessToken = generateAccessToken({ id: user.id });
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: true,
-        sameSite: 'None',
+        sameSite: "None",
       });
 
-      res.json({ status: 200, success: true, message: "Token regenerated", accessToken });
+      res.json({
+        status: 200,
+        success: true,
+        message: "Token regenerated",
+        accessToken,
+      });
     }
   );
 });
@@ -42,9 +54,17 @@ exports.CheckUser = CatchAsync(async (req, res) => {
 exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) {
-    return res.json({ status: 404, success: false, message: "User not found. upload failed" });
+    return res.json({
+      status: 404,
+      success: false,
+      message: "User not found. upload failed",
+    });
   } else if (user.personalInfoSubmitted) {
-    return res.json({ status: 404, success: false, message: "Personal details already added. upload cancelled" });
+    return res.json({
+      status: 404,
+      success: false,
+      message: "Personal details already added. upload cancelled",
+    });
   }
 
   //Delete existing profile pic if any
@@ -73,12 +93,18 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
     await s3Config.send(new DeleteObjectCommand(params));
   }
   //Saving uploaded files to user
-  user.shortReel = { url: req.files.shortreels.location, key: req.files.shortreels.key };
+  user.shortReel = {
+    url: req.files.shortreels.location,
+    key: req.files.shortreels.key,
+  };
   user.images = req.files.images.map((file) => ({
     url: file.location,
     key: file.key,
   }));
-  user.profilePic = { url: req.files.profilepic.location, key: req.files.profilepic.key };
+  user.profilePic = {
+    url: req.files.profilepic.location,
+    key: req.files.profilepic.key,
+  };
 
   //saving other values
   user.age = req.body.age;
@@ -102,7 +128,11 @@ exports.updateUserProfessinalDetails = CatchAsync(async (req, res) => {
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   } else if (user.professionalInfoSubmitted) {
-    return res.json({ status: 404, success: false, message: "Professional details already added" });
+    return res.json({
+      status: 404,
+      success: false,
+      message: "Professional details already added",
+    });
   }
 
   const formData = req.body;
@@ -133,7 +163,11 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   } else if (user.purposeSubmitted) {
-    return res.json({ status: 404, success: false, message: "purpose already added" });
+    return res.json({
+      status: 404,
+      success: false,
+      message: "purpose already added",
+    });
   }
 
   user.purpose = req.body.purpose;
@@ -160,8 +194,8 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 });
 
 exports.checkPassword = CatchAsync(async (req, res) => {
-  const userId = req.user.id
-  const user = await User.findById(userId, 'password')
+  const userId = req.user.id;
+  const user = await User.findById(userId, "password");
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
@@ -169,7 +203,7 @@ exports.checkPassword = CatchAsync(async (req, res) => {
   const hasPassword = !!user.password;
 
   res.json({ status: 200, success: true, hasPassword, message: "User found" });
-})
+});
 
 exports.changePassword = CatchAsync(async (req, res) => {
   const userId = req.user.id;
@@ -184,40 +218,245 @@ exports.changePassword = CatchAsync(async (req, res) => {
 
   // Check if the new password and confirm password match
   if (newPassword !== confirmPassword) {
-    return res.json({ status: 400, success: false, message: "Passwords do not match" });
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Passwords do not match",
+    });
   }
 
   // Check if the user has a current password and if it is correct
   if (user.password) {
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      return res.json({ status: 400, success: false, message: 'Current password is incorrect' });
+      return res.json({
+        status: 400,
+        success: false,
+        message: "Current password is incorrect",
+      });
     }
   }
 
   user.password = newPassword;
   await user.save();
 
-  res.json({ status: 200, success: true, message: "Password updated successfully" });
+  res.json({
+    status: 200,
+    success: true,
+    message: "Password updated successfully",
+  });
 });
 
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
   const { userId, notificationId } = req.body;
 
   await User.updateOne(
-    { _id: userId, 'notifications._id': notificationId },
-    { $set: { 'notifications.$.read': true } }
+    { _id: userId, "notifications._id": notificationId },
+    { $set: { "notifications.$.read": true } }
   );
 
-  res.status(200).json({ success: true });
+  res.json({
+    success: true,
+    status: 200,
+    message: "notification marked as read",
+  });
 });
 
-exports.deleteNotification = CatchAsync(async(req, res)=>{
+exports.deleteNotification = CatchAsync(async (req, res) => {
   const { userId, notificationId } = req.body;
 
-  await User.deleteOne(
-    { _id: userId, 'notifications._id': notificationId }
-  );
+  await User.deleteOne({ _id: userId, "notifications._id": notificationId });
 
-  res.status(200).json({ success: true });
+  res.json({ success: true, status: 200, message: "notification deleted" });
+});
+
+exports.fetchFriendRequests = CatchAsync(async (req, res) => {
+  const type = req.query.type || "pending";
+  try {
+    const friendsReqs = await FriendRequests.find({
+      status: type,
+      sender: req.user.id,
+    }).populate("recipient", "username profilePic");
+    if (!friendsReqs.length)
+      return res.json({
+        success: false,
+        status: 300,
+        message: "Nothing to show",
+      });
+    return res.json({
+      success: true,
+      status: 200,
+      message: `Friends ${type} list`,
+      [type]: friendsReqs,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: "failed to fetch",
+    });
+  }
+});
+
+exports.addFriendRequest = CatchAsync(async (req, res) => {
+  const { recipientId } = req.body;
+  const requestCheck = await FriendRequests.findOne({
+    sender: req.user.id,
+    recipient: recipientId,
+  });
+  if (requestCheck) {
+    if (requestCheck.status === "pending") {
+      return res.json({
+        status: 401,
+        success: false,
+        message: "Request already on pending list",
+      });
+    }
+    if (requestCheck.status === "accepted") {
+      return res.json({
+        status: 401,
+        success: false,
+        message: "You are already friends",
+      });
+    }
+    if (requestCheck.status === "declined") {
+      return res.json({
+        status: 401,
+        success: false,
+        message: "Your request is declined by the recipient",
+      });
+    }
+    if (requestCheck.status === "cancelled") {
+      requestCheck.status = "pending";
+      await requestCheck.save();
+      return res.json({
+        status: 200,
+        success: true,
+        message: "Request sended",
+        request: requestCheck,
+      });
+    }
+  }
+
+  const recipient = await User.findById(recipientId);
+
+  // Add a new notification to the recipient's notifications array
+  const notification = {
+    type: "FriendRequest",
+    message: `You have a new friend request from ${req.user.username}`,
+    from: req.user.id,
+  };
+  recipient.notifications.push(notification);
+  await recipient.save();
+
+  const request = new FriendRequests({
+    sender: req.user.id,
+    recipient: recipientId,
+  });
+  await request.save();
+  res.json({ status: 200, success: true, message: "Request sended", request });
+});
+
+exports.acceptFriendRequest = CatchAsync(async (req, res) => {
+  const { requestId } = req.params;
+  const request = await FriendRequests.findById(requestId);
+  if (!request)
+    return res.json({
+      status: 401,
+      success: false,
+      message: "Request not found",
+    });
+  if (request.recipient.toString() !== req.user.id)
+    return res.json({ status: 403, success: false, message: "Unauthorized" });
+
+  if (request.status === "accepted")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request already accepted",
+    });
+
+  request.status = "accepted";
+  await request.save();
+
+  let chat = new PrivateChat({
+    participants: [request.sender, request.recipient],
+  });
+  await chat.save();
+
+  const sender = await User.findById(request.sender);
+  const recipient = await User.findById(request.recipient);
+
+  sender.friends.push(request.recipient);
+  recipient.friends.push(request.sender);
+  
+  const notification = {
+    type: "requestAccepted",
+    message: `${req.user.username} accepted your friend request`,
+    from: request.recipient,
+  };
+  sender.notifications.push(notification);
+  await sender.save();
+  await recipient.save();
+
+  return res.json({ status: 201, success: true, message: "Request accepted" });
+});
+
+exports.declineFriendRequest = CatchAsync(async (req, res) => {
+  const { requestId } = req.params;
+  const request = await FriendRequests.findById(requestId);
+  if (!request)
+    return res.json({
+      status: 401,
+      success: false,
+      message: "Request not found",
+    });
+  if (request.recipient.toString() !== req.user.id)
+    return res.json({ status: 403, success: false, message: "Unauthorized" });
+
+  if (request.status === "declined")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request already declined",
+    });
+
+  request.status = "declined";
+  await request.save();
+
+  const sender = await User.findById(request.sender);
+
+  const notification = {
+    type: "requestDeclined",
+    message: `${req.user.username} declined your friend request`,
+    from: request.recipient,
+  };
+  sender.notifications.push(notification);
+  await sender.save();
+  return res.json({ status: 201, success: true, message: "Request declined" });
+});
+
+exports.cancelFriendRequest = CatchAsync(async (req, res) => {
+  const { requestId } = req.params;
+  const request = await FriendRequests.findById(requestId);
+  if (!request)
+    return res.json({
+      status: 401,
+      success: false,
+      message: "Request not found",
+    });
+  if (request.sender.toString() !== req.user.id)
+    return res.json({ status: 403, success: false, message: "Unauthorized" });
+
+  if (request.status === "cancelled")
+    return res.json({
+      status: 400,
+      success: false,
+      message: "Request already cancelled",
+    });
+
+  request.status = "cancelled";
+  await request.save();
+  return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
