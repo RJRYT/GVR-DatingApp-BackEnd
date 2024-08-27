@@ -51,6 +51,16 @@ router.put(
   AuthMiddleware,
   UserController.changePassword
 );
+router.put(
+  '/update/profile',
+  AuthMiddleware,
+  UploadMiddleware.fields([
+    { name: 'images', maxCount: 5 },
+    // { name: 'profilepic', maxCount: 1 },
+    { name: 'shortreels', maxCount: 1 }
+  ]),
+  UserController.updateProfile
+);
 
 router.post("/notification/markread", AuthMiddleware, UserController.MarkNotificationAsRead);
 router.post("/notification/delete", AuthMiddleware, UserController.deleteNotification);
