@@ -46,7 +46,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
   // Find users that match the preferences
   const matches = await User.find(
     matchingQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -69,50 +69,64 @@ exports.modifyPreferences = CatchAsync(async (req, res) => {
   const userId = req.user.id;
   const {
     AgeRange,
+    HeightRange,
+    WeightRange,
     Location,
     Interests,
     Hobbies,
     Education,
     Gender,
-    Smoking,
-    Drinking,
+    Religion,
+    Occupation,
+    LifeStyle,
+    Relation,
   } = req.body;
 
-  if (!AgeRange || !AgeRange.min || !AgeRange.max || !Location) {
+  // Validation for AgeRange and Location
+  if (!AgeRange || !AgeRange.min || !AgeRange.max || !Location.length) {
     return res.json({ status: 400, success: false, message: "AgeRange and Location are required." });
   }
 
-  // Get the user's matching preferences
+  // Find existing preferences
   let preferences = await Preference.findOne({ userId });
 
   if (preferences) {
     // Update existing preferences
     preferences.AgeRange = AgeRange;
+    preferences.HeightRange = HeightRange;
+    preferences.WeightRange = WeightRange;
     preferences.Location = Location;
-    preferences.Interests = Interests || [];
-    preferences.Hobbies = Hobbies || [];
-    preferences.Education = Education || [];
-    preferences.Gender = Gender || "";
-    preferences.Smoking = Smoking || "";
-    preferences.Drinking = Drinking || "";
+    preferences.Interests = Interests;
+    preferences.Hobbies = Hobbies;
+    preferences.Education = Education;
+    preferences.Gender = Gender;
+    preferences.Religion = Religion;
+    preferences.Relation = Relation;
+    preferences.Occupation = Occupation;
+    preferences.LifeStyle = LifeStyle;
 
     await preferences.save();
   } else {
-    // Add new preferences
+    // Create new preferences
     preferences = new Preference({
       userId,
       AgeRange,
+      HeightRange,
+      WeightRange,
       Location,
       Interests,
       Hobbies,
       Education,
       Gender,
-      Smoking,
-      Drinking,
+      Religion,
+      Relation,
+      Occupation,
+      LifeStyle
     });
 
     await preferences.save();
   }
+
   res.json({ status: 200, success: true, message: "Preferences saved successfully.", preferences });
 });
 
@@ -122,7 +136,70 @@ exports.viewPreferences = CatchAsync(async (req, res) => {
   // Get the user's matching preferences
   const preferences = await Preference.findOne({ userId });
   if (!preferences) {
-    return res.json({ status: 400, success: false, message: "No matching preferences found" });
+    return res.json({ status: 400, success: false, message: "No matching preferences found." });
   }
+
   res.json({ status: 200, success: true, preferences });
 });
+
+exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { page = 1, limit = 10, filter = "" } = req.query;
+  const preferences = await Preference.findOne({ userId });
+  const user = await User.findById(userId);
+  let fetchQuery = {
+    _id: { $ne: userId },
+    personalInfoSubmitted: true,
+    professionalInfoSubmitted: true,
+    purposeSubmitted: true
+  };
+  if (filter) {
+    switch (filter) {
+      case "nearby": {
+        fetchQuery.location = user.location;
+        break;
+      }
+      case "qualification": {
+        if (preferences?.Education && preferences?.Education?.length) {
+          fetchQuery["qualification.value"] = { $in: preferences.Education.map((edu)=>edu.value) };
+        } else {
+          fetchQuery.qualification = user.qualification;
+        }
+        break;
+      }
+      case "interests": {
+        if (preferences?.Education && preferences?.Education?.length) {
+          fetchQuery["interests.value"] = { $in: preferences.Interests.map((intrst)=>intrst.value) };
+        } else {
+          fetchQuery.interests = user.interests;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  
+  // Find users that match the preferences
+  const matches = await User.find(
+    fetchQuery,
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+  )
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .exec();
+
+  // Get total matching users count
+  const count = await User.countDocuments(fetchQuery);
+
+  res.json({
+    status: 200,
+    success: true,
+    message: "filtered matches",
+    matches,
+    totalmatches: count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: page,
+  });
+});
+

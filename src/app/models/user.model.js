@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const ProfilePicSchema = mongoose.Schema({
@@ -22,7 +22,7 @@ const ShortReelSchema = mongoose.Schema({
 const notificationSchema = new mongoose.Schema({
   type: { type: String, required: true },
   message: { type: String, required: true },
-  from: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  from: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   read: { type: Boolean, default: false },
   timestamp: { type: Date, default: Date.now },
 });
@@ -63,6 +63,7 @@ const UserSchema = mongoose.Schema(
     jobTitle: { type: String },
     purpose: { type: String },
     notifications: [notificationSchema],
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
     fake: { type: Boolean },
@@ -90,4 +91,3 @@ UserSchema.method("toJSON", function () {
 });
 
 module.exports = mongoose.model("User", UserSchema);
-

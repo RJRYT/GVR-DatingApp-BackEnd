@@ -1,4 +1,4 @@
-const { User, Messages } = require("../models");
+const { User, PrivateMessages } = require("../models");
 const jwt = require('jsonwebtoken');
 
 module.exports = (io) => {
@@ -33,7 +33,7 @@ module.exports = (io) => {
     });
 
     socket.on('sendMessage', async ({ chatId, content }) => {
-      const message = new Messages({ sender: userId, content, chatRoom: chatId });
+      const message = new PrivateMessages({ sender: userId, content, chatRoom: chatId });
       await message.save();
       io.to(chatId).emit('message', message);
     });

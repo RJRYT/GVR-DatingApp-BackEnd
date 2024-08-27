@@ -13,4 +13,6 @@ router.get("/me", MatchController.matchAlgorithm);
 router.get("/preferences", MatchController.viewPreferences);
 router.post("/preferences", MatchController.modifyPreferences);
 
+router.get("/filtered", MatchController.fetchFilteredMatches);
+
 module.exports = router;
