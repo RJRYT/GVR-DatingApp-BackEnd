@@ -176,10 +176,10 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
   await user.save();
 
   res.json({ status: 200, success: true, message: "Updated successfully" });
-});    
+});
 
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
-  console.log(req.params)
+  console.log(req.params);
   const { userId } = req.params;
 
   const user = await User.findById(
@@ -248,15 +248,15 @@ exports.changePassword = CatchAsync(async (req, res) => {
   });
 });
 
-exports.updateProfile=CatchAsync(async(req,res)=>{
-  console.log(req.body)
-  console.log('Files:', req.files);
+exports.updateProfile = CatchAsync(async (req, res) => {
+  console.log(req.body);
+  console.log("Files:", req.files);
   const user = await User.findById(req.user.id);
   //Delete existing profile pic if any
   if (user.profilePic && user.profilePic.key) {
     const params = {
       Bucket: process.env.S3_BUCKET,
-      Key: user.profilePic.key,     
+      Key: user.profilePic.key,
     };
     await s3Config.send(new DeleteObjectCommand(params));
   }
@@ -280,7 +280,7 @@ exports.updateProfile=CatchAsync(async(req,res)=>{
 
   // Saving uploaded files to user
   if (req.files?.shortreels) {
-    console.log('Short reels:', req.files.shortreels); // Debug l
+    console.log("Short reels:", req.files.shortreels); // Debug l
     user.shortReel = {
       url: req.files.shortreels[0]?.location,
       key: req.files.shortreels[0]?.key,
@@ -288,19 +288,26 @@ exports.updateProfile=CatchAsync(async(req,res)=>{
   }
 
   if (req.files?.images) {
-    console.log('Images:', req.files.images); // Debug line
+    console.log("Images:", req.files.images); // Debug line
     user.images = req.files.images.map((file) => ({
       url: file.location,
       key: file.key,
     }));
   }
-    // user.profilePic = { url: req.files.profilepic.location, key: req.files.profilepic.key };
 
-      //saving other values
+  if(req.files?.profilePic){
+    user.profilePic = {
+      url: req.files.profilepic?.location,
+      key: req.files.profilepic?.key,
+    };
+  
+  }
+ 
   user.username = req.body.username;
+  user.bio = req.body.bio;
   await user.save();
   return res.json({ status: 200, success: true, message: "Upload done", user });
-})
+});
 
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
   const { userId, notificationId } = req.body;

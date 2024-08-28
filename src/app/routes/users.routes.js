@@ -77,7 +77,7 @@ router.put(
   AuthMiddleware,
   UploadMiddleware.fields([
     { name: 'images', maxCount: 5 },
-    // { name: 'profilepic', maxCount: 1 },
+    { name: 'profilePic', maxCount:1},
     { name: 'shortreels', maxCount: 1 }
   ]),
   UserController.updateProfile
