@@ -77,6 +77,16 @@ router.put(
   AuthMiddleware,
   UserController.cancelFriendRequest
 );
+router.put(
+  '/update/profile',
+  AuthMiddleware,
+  UploadMiddleware.fields([
+    { name: 'images', maxCount: 5 },
+    { name: 'profilePic', maxCount:1},
+    { name: 'shortreels', maxCount: 1 }
+  ]),
+  UserController.updateProfile
+);
 
 router.get("/shortlist", AuthMiddleware, UserController.listMyShortList);
 router.get("/shortlist/by", AuthMiddleware, UserController.ListShortListedBy);
