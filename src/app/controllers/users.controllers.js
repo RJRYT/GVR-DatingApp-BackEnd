@@ -190,6 +190,11 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
 
+  if (!user.viewers?.includes(req.user.id)) {
+    user.viewers?.addToSet(req.user.id);
+    await user.save();
+  }
+
   res.json({ status: 200, success: true, user, message: "User found" });
 });
 
@@ -268,6 +273,27 @@ exports.deleteNotification = CatchAsync(async (req, res) => {
   await User.deleteOne({ _id: userId, "notifications._id": notificationId });
 
   res.json({ success: true, status: 200, message: "notification deleted" });
+});
+
+exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
+  const pendingFriends = await FriendRequests.find({
+    recipient: req.user.id,
+    status: "pending",
+  }).populate("sender", "username profilePic");
+
+  if (!pendingFriends.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `Friends pending friend list`,
+    pending: pendingFriends,
+  });
 });
 
 exports.fetchFriendRequests = CatchAsync(async (req, res) => {
@@ -370,11 +396,12 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
   }
 
   const recipient = await User.findById(recipientId);
+  const user = await User.findById(req.user.id);
 
   // Add a new notification to the recipient's notifications array
   const notification = {
     type: "FriendRequest",
-    message: `You have a new friend request from ${req.user.username}`,
+    message: `You have a new friend request from ${user.username}`,
     from: req.user.id,
   };
   recipient.notifications.push(notification);
@@ -435,8 +462,8 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const sender = await User.findById(request.sender);
   const recipient = await User.findById(request.recipient);
 
-  sender.friends.push(request.recipient);
-  recipient.friends.push(request.sender);
+  sender.friends.addToSet(request.recipient);
+  recipient.friends.addToSet(request.sender);
 
   const notification = {
     type: "requestAccepted",
@@ -520,4 +547,117 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   request.status = "cancelled";
   await request.save();
   return res.json({ status: 201, success: true, message: "Request cancelled" });
+});
+
+exports.updateShortListedUsers = CatchAsync(async (req, res) => {
+  const { userId } = req.body;
+  if (!userId)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Please provide user id to add/remove",
+    });
+
+  const shortListUser = await User.findById(userId);
+  if (!shortListUser)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User not found",
+    });
+
+  const user = await User.findById(req.user.id);
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.includes(userId)) {
+    user.shortlists.addToSet(userId);
+    await user.save();
+  } else {
+    user.shortlists.pull(userId);
+    await user.save();
+  }
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `user has ${
+      user.shortlists.includes(userId) ? "added to" : "removed from"
+    } your shortlist`,
+  });
+});
+
+exports.listMyShortList = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "shortlists",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your shortlisted users`,
+    shortlist: user.shortlists,
+  });
+});
+
+exports.ListShortListedBy = CatchAsync(async (req, res) => {
+  const users = User.find({ shortlists: req.user.id }, "username, profilePic");
+  if (!users.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `List of users who shortlisted you`,
+    shortlist: users,
+  });
+});
+
+exports.listMyProfileViewers = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "viewers",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if ((!user.viewers.length))
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your profile viewed users`,
+    viewers: user.viewers,
+  });
 });

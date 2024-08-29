@@ -64,6 +64,8 @@ const UserSchema = mongoose.Schema(
     purpose: { type: String },
     notifications: [notificationSchema],
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    shortlists: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
     fake: { type: Boolean },

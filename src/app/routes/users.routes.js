@@ -52,6 +52,11 @@ router.post(
 );
 
 router.get("/friends", AuthMiddleware, UserController.fetchFriendRequests);
+router.get(
+  "/friends/pending",
+  AuthMiddleware,
+  UserController.fetchMyPendingRequests
+);
 router.post(
   "/friends/request",
   AuthMiddleware,
@@ -72,5 +77,11 @@ router.put(
   AuthMiddleware,
   UserController.cancelFriendRequest
 );
+
+router.get("/shortlist", AuthMiddleware, UserController.listMyShortList);
+router.get("/shortlist/by", AuthMiddleware, UserController.ListShortListedBy);
+router.post("/shortlist", AuthMiddleware, UserController.updateShortListedUsers);
+
+router.get("/views", AuthMiddleware, UserController.listMyProfileViewers);
 
 module.exports = router;
