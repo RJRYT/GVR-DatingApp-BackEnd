@@ -316,26 +316,37 @@ exports.updateProfile = CatchAsync(async (req, res) => {
 });
 
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
   await User.updateOne(
-    { _id: userId, "notifications._id": notificationId },
+    { _id: req.user.id, "notifications._id": notificationId },
     { $set: { "notifications.$.read": true } }
   );
+
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationRead", { notificationId });
 
   res.json({
     success: true,
     status: 200,
-    message: "notification marked as read",
+    message: "Notification marked as read",
   });
 });
 
 exports.deleteNotification = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
-  await User.deleteOne({ _id: userId, "notifications._id": notificationId });
+  await User.updateOne(
+    { _id: req.user.id },
+    { $pull: { notifications: { _id: notificationId } } }
+  );
 
-  res.json({ success: true, status: 200, message: "notification deleted" });
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationDeleted", { notificationId });
+
+  res.json({ success: true, status: 200, message: "Notification deleted" });
 });
 
 exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
@@ -468,7 +479,7 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
     from: req.user.id,
   };
   recipient.notifications.push(notification);
-  io.to(recipientId).emit("newNotification", notification);
+  req.app.locals.io.to(recipientId).emit("newNotification", notification);
   await recipient.save();
 
   const request = new FriendRequests({
@@ -535,7 +546,7 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
     from: request.recipient,
   };
   sender.notifications.push(notification);
-  io.to(request.sender).emit("newNotification", notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   await recipient.save();
 
@@ -580,7 +591,7 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
     from: request.recipient,
   };
   sender.notifications.push(notification);
-  io.to(request.sender).emit("newNotification", notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   return res.json({ status: 201, success: true, message: "Request declined" });
 });

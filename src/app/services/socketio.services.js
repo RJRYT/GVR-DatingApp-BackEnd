@@ -27,6 +27,8 @@ module.exports = (io) => {
 
   io.on("connection", (socket) => {
     const userId = socket.user.id;
+    socket.join(userId);
+    console.log(`User with ID ${userId} connected and joined room ${userId}`);
     User.findByIdAndUpdate(userId, { isOnline: true, lastActive: Date.now() })
       .then(() => {
         io.emit("userOnline", userId);
