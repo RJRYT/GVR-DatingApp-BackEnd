@@ -52,6 +52,7 @@ exports.CheckUser = CatchAsync(async (req, res) => {
 });
 
 exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
+  console.log(req.body,"//////////////")
   const user = await User.findById(req.user.id);
   if (!user) {
     return res.json({
@@ -111,7 +112,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.dateOfBirth = req.body.dateOfBirth;
   user.gender = req.body.gender;
   user.hobbies = JSON.parse(req.body.hobbies);
-  user.location = req.body.location;
+  user.location =  req.body.location;
   user.interests = JSON.parse(req.body.interests);
   user.smokingHabits = req.body.smokingHabits;
   user.drinkingHabits = req.body.drinkingHabits;
@@ -119,6 +120,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.personalInfoSubmitted = true;
 
   await user.save();
+  console.log(user,'user......')
   return res.json({ status: 200, success: true, message: "Upload done", user });
 });
 
