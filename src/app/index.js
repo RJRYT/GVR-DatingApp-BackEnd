@@ -72,6 +72,6 @@ const io = require('socket.io')(server, {
 
 SocketIo(io);
 
-app.set("socketio", io);
+app.locals.io = io;
 
 module.exports = server;

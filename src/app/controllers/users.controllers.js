@@ -190,9 +190,11 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
-
-  if (!user.viewers?.includes(req.user.id)) {
-    user.viewers?.addToSet(req.user.id);
+  if (!user.viewers) {
+    user.viewers = [];
+  }
+  if (!user.viewers.includes(req.user.id)) {
+    user.viewers.addToSet(req.user.id);
     await user.save();
   }
 
@@ -300,14 +302,13 @@ exports.updateProfile = CatchAsync(async (req, res) => {
     }));
   }
 
-  if(req.files?.profilePic){
+  if (req.files?.profilePic) {
     user.profilePic = {
       url: req.files.profilepic?.location,
       key: req.files.profilepic?.key,
     };
-  
   }
- 
+
   user.username = req.body.username;
   user.bio = req.body.bio;
   await user.save();
@@ -467,6 +468,7 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
     from: req.user.id,
   };
   recipient.notifications.push(notification);
+  io.to(recipientId).emit("newNotification", notification);
   await recipient.save();
 
   const request = new FriendRequests({
@@ -529,10 +531,11 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
 
   const notification = {
     type: "requestAccepted",
-    message: `${req.user.username} accepted your friend request`,
+    message: `${sender.username} accepted your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   await recipient.save();
 
@@ -569,13 +572,15 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
   await request.save();
 
   const sender = await User.findById(request.sender);
+  const requester = await User.findById(request.recipient);
 
   const notification = {
     type: "requestDeclined",
-    message: `${req.user.username} declined your friend request`,
+    message: `${requester.username} declined your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   return res.json({ status: 201, success: true, message: "Request declined" });
 });
@@ -681,7 +686,10 @@ exports.listMyShortList = CatchAsync(async (req, res) => {
 });
 
 exports.ListShortListedBy = CatchAsync(async (req, res) => {
-  const users = User.find({ shortlists: req.user.id }, "username, profilePic");
+  const users = await User.find(
+    { shortlists: { $in: [req.user.id] } },
+    "username profilePic"
+  );
   if (!users.length)
     return res.json({
       success: false,
@@ -709,7 +717,7 @@ exports.listMyProfileViewers = CatchAsync(async (req, res) => {
       message: "User error. please re-login",
     });
 
-  if ((!user.viewers.length))
+  if (!user.viewers.length)
     return res.json({
       success: false,
       status: 300,
