@@ -66,8 +66,12 @@ process.on("uncaughtException", (err, origin) => {
 
 // Socket.io config
 const server = require('http').createServer(app);
-const io = require('socket.io')(server, {
-    cors: corsConfig
+const io = require("socket.io")(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
 });
 
 SocketIo(io);
