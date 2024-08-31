@@ -1,4 +1,5 @@
 const { User, FriendRequests, PrivateChat } = require("../models");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
@@ -179,8 +180,11 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
 });
 
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
-  console.log(req.params);
   const { userId } = req.params;
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "User id is not valid" });
+  }
 
   const user = await User.findById(
     userId,
@@ -492,6 +496,9 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
 
 exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -555,6 +562,9 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
 
 exports.declineFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -598,6 +608,9 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
 
 exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -636,6 +649,10 @@ exports.updateShortListedUsers = CatchAsync(async (req, res) => {
       message: "Please provide user id to add/remove",
     });
 
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
   const shortListUser = await User.findById(userId);
   if (!shortListUser)
     return res.json({
@@ -663,9 +680,8 @@ exports.updateShortListedUsers = CatchAsync(async (req, res) => {
   return res.json({
     status: 201,
     success: true,
-    message: `user has ${
-      user.shortlists.includes(userId) ? "added to" : "removed from"
-    } your shortlist`,
+    message: `user has ${user.shortlists.includes(userId) ? "added to" : "removed from"
+      } your shortlist`,
   });
 });
 

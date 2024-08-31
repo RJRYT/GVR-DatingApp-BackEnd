@@ -52,7 +52,7 @@ app.use(GlobalErrorMiddleware);
 // Schedule the cleanup to run daily at midnight
 cron.schedule("0 0 * * *", () => {
   console.log("[Corn Job]:Corn job triggered...");
-  CleanupFiles();
+  //CleanupFiles();
 });
 
 // Server error logger
