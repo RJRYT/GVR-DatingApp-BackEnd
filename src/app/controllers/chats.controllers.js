@@ -114,7 +114,7 @@ exports.fetchChats = CatchAsync(async (req, res) => {
     const otherParticipant = chat.participants.find(p => p._id.toString() !== userId.toString());
 
     const lastMessage = await PrivateMessages.findOne({ chatRoom: chat._id })
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: -1, _id: -1 })
       .lean();
 
     return {
@@ -126,7 +126,7 @@ exports.fetchChats = CatchAsync(async (req, res) => {
       },
       lastMessage: {
         text: lastMessage ? lastMessage.content : "No messages yet",
-        read: lastMessage ? lastMessage.read : true,
+        read: lastMessage ? (lastMessage.sender === req.user.id ? true : lastMessage.read) : true,
         timestamp: lastMessage ? lastMessage.createdAt : null,
       },
       isNew: Boolean(!lastMessage),
@@ -135,3 +135,17 @@ exports.fetchChats = CatchAsync(async (req, res) => {
 
   res.json({ status: 200, success: true, message: "Your chats list", chats: formattedChats });
 })
+
+exports.markChatsAsRead = CatchAsync(async(req, res)=>{
+  const { chatId } = req.params;
+
+    await PrivateMessages.updateMany(
+      { chatRoom:chatId, sender: { $ne: req.user.id }, read: false },
+      { read: true }
+    );
+
+    req.app.locals.io.to(chatId).emit("messagesSeen", req.user.id);
+    req.app.locals.io.to(req.user.id).emit("UpdateLastMessageSeen", chatId);
+
+    res.json({ status: 200, success: true, message: "messages marked as read"});
+});
