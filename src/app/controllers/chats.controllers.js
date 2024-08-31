@@ -93,8 +93,10 @@ exports.leaveFromGroup = CatchAsync(async (req, res) => {
 });
 
 exports.fetchPrivateMessages = CatchAsync(async (req, res) => {
-  const chat = await PrivateChat.findById(req.params.chatId).populate('messages');
-  res.json({ status: 200, success: true, message: "Your chats", chats: chat.messages });
+  const chat = await PrivateChat.findById(req.params.chatId)
+    .populate("messages")
+    .populate("participants", "username profilePic isOnline lastActive");
+  res.json({ status: 200, success: true, message: "Your chats", chats: chat.messages, users: chat.participants });
 });
 
 exports.fetchGroupMessages = CatchAsync(async (req, res) => {
@@ -123,10 +125,11 @@ exports.fetchChats = CatchAsync(async (req, res) => {
         profilePic: otherParticipant.profilePic,
       },
       lastMessage: {
-        text: lastMessage ? lastMessage.text : "No messages yet",
+        text: lastMessage ? lastMessage.content : "No messages yet",
         read: lastMessage ? lastMessage.read : true,
         timestamp: lastMessage ? lastMessage.createdAt : null,
       },
+      isNew: Boolean(!lastMessage),
     };
   }));
 
