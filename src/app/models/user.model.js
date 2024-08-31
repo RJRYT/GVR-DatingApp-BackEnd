@@ -37,6 +37,7 @@ const UserSchema = mongoose.Schema(
     password: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     phoneNumber: { type: String, unique: true, sparse: true },
+    about: { type: String, default: "" },
     date: { type: Date, default: Date.now },
     numberVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },

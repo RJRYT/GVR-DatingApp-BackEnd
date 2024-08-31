@@ -95,16 +95,16 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   }
   //Saving uploaded files to user
   user.shortReel = {
-    url: req.files.shortreels.location,
-    key: req.files.shortreels.key,
+    url: req.files.shortreels[0].location,
+    key: req.files.shortreels[0].key,
   };
   user.images = req.files.images.map((file) => ({
     url: file.location,
     key: file.key,
   }));
   user.profilePic = {
-    url: req.files.profilepic.location,
-    key: req.files.profilepic.key,
+    url: req.files.profilepic[0].location,
+    key: req.files.profilepic[0].key,
   };
 
   //saving other values
@@ -314,7 +314,7 @@ exports.updateProfile = CatchAsync(async (req, res) => {
   }
 
   user.username = req.body.username;
-  user.bio = req.body.bio;
+  user.about = req.body.bio;
   await user.save();
   return res.json({ status: 200, success: true, message: "Upload done", user });
 });
