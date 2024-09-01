@@ -52,6 +52,11 @@ router.post(
 );
 
 router.get("/friends", AuthMiddleware, UserController.fetchFriendRequests);
+router.get(
+  "/friends/pending",
+  AuthMiddleware,
+  UserController.fetchMyPendingRequests
+);
 router.post(
   "/friends/request",
   AuthMiddleware,
@@ -72,6 +77,26 @@ router.put(
   AuthMiddleware,
   UserController.cancelFriendRequest
 );
+router.put(
+  "/update/profile",
+  AuthMiddleware,
+  UploadMiddleware.fields([
+    { name: "images", maxCount: 5 },
+    { name: "profilepic", maxCount: 1 },
+    { name: "shortreels", maxCount: 1 },
+  ]),
+  UserController.updateProfile
+);
+
+router.get("/shortlist", AuthMiddleware, UserController.listMyShortList);
+router.get("/shortlist/by", AuthMiddleware, UserController.ListShortListedBy);
+router.post(
+  "/shortlist",
+  AuthMiddleware,
+  UserController.updateShortListedUsers
+);
+
+router.get("/views", AuthMiddleware, UserController.listMyProfileViewers);
 
 
 router.get('/privacy', AuthMiddleware, UserController.privacyDetails); 

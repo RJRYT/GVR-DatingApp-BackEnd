@@ -26,6 +26,7 @@ exports.doLogin = CatchAsync(async (req, res) => {
   else return res.json({ status: 400, success: false, message: "Missing credentials" });
   const user = await User.findOne(query);
   if (!user) return res.json({ status: 400, success: false, message: "User not found" });
+  if (!user.password) return res.json({ status: 400, success: false, message: "Invalid login method. try login with google" });
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch)

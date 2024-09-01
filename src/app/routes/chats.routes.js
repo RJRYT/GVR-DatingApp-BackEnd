@@ -16,7 +16,8 @@ router.post("/groups/:groupId/invite", ChatController.inviteToGroupChat);
 router.post("/groups/:groupId/respond", ChatController.respondToGroupInvite);
 router.post("/groups/:groupId/leave", ChatController.leaveFromGroup);
 
-router.get("/messages/private/:chatId", ChatController.fetchPrivateMessages);
 router.get("/messages/group/:chatId", ChatController.fetchGroupMessages);
+
+router.get("/messages/private/:chatId", ChatController.fetchPrivateMessages);
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const { User, FriendRequests, PrivateChat } = require("../models");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
@@ -96,16 +97,16 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   }
   //Saving uploaded files to user
   user.shortReel = {
-    url: req.files.shortreels.location,
-    key: req.files.shortreels.key,
+    url: req.files.shortreels[0].location,
+    key: req.files.shortreels[0].key,
   };
   user.images = req.files.images.map((file) => ({
     url: file.location,
     key: file.key,
   }));
   user.profilePic = {
-    url: req.files.profilepic.location,
-    key: req.files.profilepic.key,
+    url: req.files.profilepic[0].location,
+    key: req.files.profilepic[0].key,
   };
 
   //saving other values
@@ -183,6 +184,10 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
   const { userId } = req.params;
 
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "User id is not valid" });
+  }
+
   const user = await User.findById(
     userId,
     "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
@@ -190,6 +195,13 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
+  }
+  if (!user.viewers) {
+    user.viewers = [];
+  }
+  if (!user.viewers.includes(req.user.id)) {
+    user.viewers.addToSet(req.user.id);
+    await user.save();
   }
 
   res.json({ status: 200, success: true, user, message: "User found" });
@@ -302,27 +314,119 @@ exports.changePassword = CatchAsync(async (req, res) => {
   });
 });
 
+exports.updateProfile = CatchAsync(async (req, res) => {
+  console.log(req.body);
+  console.log("Files:", req.files);
+  const user = await User.findById(req.user.id);
+  //Delete existing profile pic if any
+  if (user.profilePic && user.profilePic.key) {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: user.profilePic.key,
+    };
+    await s3Config.send(new DeleteObjectCommand(params));
+  }
+  //Delete existing images if any
+  if (user.images && user.images.length > 0) {
+    for (const pic of user.images) {
+      if (pic.key) {
+        const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
+        await s3Config.send(new DeleteObjectCommand(params));
+      }
+    }
+  }
+  //Delete existing shortreel if any
+  if (user.shortReel && user.shortReel.key) {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: user.shortReel.key,
+    };
+    await s3Config.send(new DeleteObjectCommand(params));
+  }
+
+  // Saving uploaded files to user
+  if (req.files?.shortreels) {
+    console.log("Short reels:", req.files.shortreels); // Debug l
+    user.shortReel = {
+      url: req.files.shortreels[0]?.location,
+      key: req.files.shortreels[0]?.key,
+    };
+  }
+
+  if (req.files?.images) {
+    console.log("Images:", req.files.images); // Debug line
+    user.images = req.files.images.map((file) => ({
+      url: file.location,
+      key: file.key,
+    }));
+  }
+
+  if (req.files?.profilePic) {
+    user.profilePic = {
+      url: req.files.profilepic?.location,
+      key: req.files.profilepic?.key,
+    };
+  }
+
+  user.username = req.body.username;
+  user.about = req.body.bio;
+  await user.save();
+  return res.json({ status: 200, success: true, message: "Upload done", user });
+});
+
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
   await User.updateOne(
-    { _id: userId, "notifications._id": notificationId },
+    { _id: req.user.id, "notifications._id": notificationId },
     { $set: { "notifications.$.read": true } }
   );
+
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationRead", { notificationId });
 
   res.json({
     success: true,
     status: 200,
-    message: "notification marked as read",
+    message: "Notification marked as read",
   });
 });
 
 exports.deleteNotification = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
-  await User.deleteOne({ _id: userId, "notifications._id": notificationId });
+  await User.updateOne(
+    { _id: req.user.id },
+    { $pull: { notifications: { _id: notificationId } } }
+  );
 
-  res.json({ success: true, status: 200, message: "notification deleted" });
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationDeleted", { notificationId });
+
+  res.json({ success: true, status: 200, message: "Notification deleted" });
+});
+
+exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
+  const pendingFriends = await FriendRequests.find({
+    recipient: req.user.id,
+    status: "pending",
+  }).populate("sender", "username profilePic");
+
+  if (!pendingFriends.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `Friends pending friend list`,
+    pending: pendingFriends,
+  });
 });
 
 exports.fetchFriendRequests = CatchAsync(async (req, res) => {
@@ -425,14 +529,16 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
   }
 
   const recipient = await User.findById(recipientId);
+  const user = await User.findById(req.user.id);
 
   // Add a new notification to the recipient's notifications array
   const notification = {
     type: "FriendRequest",
-    message: `You have a new friend request from ${req.user.username}`,
+    message: `You have a new friend request from ${user.username}`,
     from: req.user.id,
   };
   recipient.notifications.push(notification);
+  req.app.locals.io.to(recipientId).emit("newNotification", notification);
   await recipient.save();
 
   const request = new FriendRequests({
@@ -445,6 +551,9 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
 
 exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -490,15 +599,16 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const sender = await User.findById(request.sender);
   const recipient = await User.findById(request.recipient);
 
-  sender.friends.push(request.recipient);
-  recipient.friends.push(request.sender);
+  sender.friends.addToSet(request.recipient);
+  recipient.friends.addToSet(request.sender);
 
   const notification = {
     type: "requestAccepted",
-    message: `${req.user.username} accepted your friend request`,
+    message: `${sender.username} accepted your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   await recipient.save();
 
@@ -507,6 +617,9 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
 
 exports.declineFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -535,19 +648,24 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
   await request.save();
 
   const sender = await User.findById(request.sender);
+  const requester = await User.findById(request.recipient);
 
   const notification = {
     type: "requestDeclined",
-    message: `${req.user.username} declined your friend request`,
+    message: `${requester.username} declined your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   return res.json({ status: 201, success: true, message: "Request declined" });
 });
 
 exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -577,6 +695,7 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
 
+<<<<<<< HEAD
 
 exports.logUser = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id).select("-password");
@@ -723,3 +842,123 @@ exports.deleteAllSessions = async (req, res) => {
   }
 };
 
+=======
+exports.updateShortListedUsers = CatchAsync(async (req, res) => {
+  const { userId } = req.body;
+  if (!userId)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Please provide user id to add/remove",
+    });
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
+  const shortListUser = await User.findById(userId);
+  if (!shortListUser)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User not found",
+    });
+
+  const user = await User.findById(req.user.id);
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.includes(userId)) {
+    user.shortlists.addToSet(userId);
+    await user.save();
+  } else {
+    user.shortlists.pull(userId);
+    await user.save();
+  }
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `user has ${user.shortlists.includes(userId) ? "added to" : "removed from"
+      } your shortlist`,
+  });
+});
+
+exports.listMyShortList = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "shortlists",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your shortlisted users`,
+    shortlist: user.shortlists,
+  });
+});
+
+exports.ListShortListedBy = CatchAsync(async (req, res) => {
+  const users = await User.find(
+    { shortlists: { $in: [req.user.id] } },
+    "username profilePic"
+  );
+  if (!users.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `List of users who shortlisted you`,
+    shortlist: users,
+  });
+});
+
+exports.listMyProfileViewers = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "viewers",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.viewers.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your profile viewed users`,
+    viewers: user.viewers,
+  });
+});
+>>>>>>> 8f2d32818d73936ff998682a22df344da7dddc76
