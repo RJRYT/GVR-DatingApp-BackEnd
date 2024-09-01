@@ -27,15 +27,12 @@ exports.doLogin = CatchAsync(async (req, res) => {
   const user = await User.findOne(query);
   if (!user) return res.json({ status: 400, success: false, message: "User not found" });
   if (!user.password) return res.json({ status: 400, success: false, message: "Invalid login method. try login with google" });
-
+  
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch)
     return res.json({ status: 400, success: false, message: "Invalid credentials" });
 
-  if (user.twoFA) {
-    // If 2FA is enabled, redirect to the 2FA verification page
-    res.json({ status: 200, success: true, message: "2FA required", twoFA: true });
-  } else {
+
   const AccessToken = generateAccessToken({ id: user.id });
   const RefreshToken = generateRefreshToken({ id: user.id });
 
@@ -50,6 +47,13 @@ exports.doLogin = CatchAsync(async (req, res) => {
     secure: true,
     sameSite: 'None',
   });
+
+
+  if (user.twoFA) {
+    // If 2FA is enabled, redirect to the 2FA verification page
+    res.json({ status: 200, success: true, message: "2FA required", twoFA: true });
+  } else {
+
   
 
    // Update last login details
