@@ -15,7 +15,7 @@ exports.createGroupChat = CatchAsync(async (req, res) => {
 
 exports.inviteToGroupChat = CatchAsync(async (req, res) => {
   const { userId } = req.body;
-  if(!mongoose.isValidObjectId(req.params.groupId)) {
+  if (!mongoose.isValidObjectId(req.params.groupId)) {
     return res.json({ status: 403, success: false, message: "group id is not valid" });
   }
   const groupChat = await GroupChat.findById(req.params.groupId);
@@ -42,7 +42,7 @@ exports.inviteToGroupChat = CatchAsync(async (req, res) => {
 
 exports.respondToGroupInvite = CatchAsync(async (req, res) => {
   const { status } = req.body;  // 'accepted' or 'declined'
-  if(!mongoose.isValidObjectId(req.params.groupId)) {
+  if (!mongoose.isValidObjectId(req.params.groupId)) {
     return res.json({ status: 403, success: false, message: "group id is not valid" });
   }
   const groupChat = await GroupChat.findById(req.params.groupId);
@@ -72,7 +72,7 @@ exports.respondToGroupInvite = CatchAsync(async (req, res) => {
 });
 
 exports.leaveFromGroup = CatchAsync(async (req, res) => {
-  if(!mongoose.isValidObjectId(req.params.groupId)) {
+  if (!mongoose.isValidObjectId(req.params.groupId)) {
     return res.json({ status: 403, success: false, message: "group id is not valid" });
   }
   const groupChat = await GroupChat.findById(req.params.groupId);
@@ -103,7 +103,7 @@ exports.leaveFromGroup = CatchAsync(async (req, res) => {
 });
 
 exports.fetchPrivateMessages = CatchAsync(async (req, res) => {
-  if(!mongoose.isValidObjectId(req.params.chatId)) {
+  if (!mongoose.isValidObjectId(req.params.chatId)) {
     return res.json({ status: 403, success: false, message: "chat id is not valid" });
   }
   const chat = await PrivateChat.findById(req.params.chatId)
@@ -113,7 +113,7 @@ exports.fetchPrivateMessages = CatchAsync(async (req, res) => {
 });
 
 exports.fetchGroupMessages = CatchAsync(async (req, res) => {
-  if(!mongoose.isValidObjectId(req.params.chatId)) {
+  if (!mongoose.isValidObjectId(req.params.chatId)) {
     return res.json({ status: 403, success: false, message: "chat id is not valid" });
   }
   const chat = await GroupChat.findById(req.params.chatId).populate('messages');
@@ -142,7 +142,7 @@ exports.fetchChats = CatchAsync(async (req, res) => {
       },
       lastMessage: {
         text: lastMessage ? lastMessage.content : "No messages yet",
-        read: lastMessage ? (lastMessage.sender === req.user.id ? true : lastMessage.read) : true,
+        read: lastMessage ? (lastMessage.sender.toString() === req.user.id.toString() ? true : lastMessage.read) : true,
         timestamp: lastMessage ? lastMessage.createdAt : null,
       },
       isNew: Boolean(!lastMessage),
@@ -151,17 +151,3 @@ exports.fetchChats = CatchAsync(async (req, res) => {
 
   res.json({ status: 200, success: true, message: "Your chats list", chats: formattedChats });
 })
-
-exports.markChatsAsRead = CatchAsync(async(req, res)=>{
-  const { chatId } = req.params;
-
-    await PrivateMessages.updateMany(
-      { chatRoom:chatId, sender: { $ne: req.user.id }, read: false },
-      { read: true }
-    );
-
-    req.app.locals.io.to(chatId).emit("messagesSeen", req.user.id);
-    req.app.locals.io.to(req.user.id).emit("UpdateLastMessageSeen", chatId);
-
-    res.json({ status: 200, success: true, message: "messages marked as read"});
-});

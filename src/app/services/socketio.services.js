@@ -14,12 +14,16 @@ module.exports = (io) => {
         jwt.verify(
           token,
           process.env.JWT_ACCESS_TOKEN_SECRET,
-          (err, decoded) => {
+          async (err, decoded) => {
             if (err) {
               console.log("JWT verification error:", err);
               return next(new Error("Authentication error"));
             }
-            socket.user = decoded; // Attach the user object to the socket
+            socket.user = decoded;
+            const user = await User.findById(socket.user.id, "username");
+            if (!user) return next(new Error("Invilid user token"));
+            socket.user = user;
+            console.log("[Socket.io]: requesting user: ", user);
             next();
           }
         );
@@ -35,26 +39,33 @@ module.exports = (io) => {
   io.on("connection", (socket) => {
     const userId = socket.user.id;
     socket.join(userId);
-    console.log(`User with ID ${userId} connected and joined room ${userId}`);
 
     User.findByIdAndUpdate(userId, { isOnline: true, lastActive: Date.now() })
       .then(() => {
-        io.emit("userOnline", userId);
+        socket.broadcast.emit("userOnline", userId);
       })
       .catch((err) => console.error("Error updating online status:", err));
 
+    socket.onAny((eventName, ...args) => {
+      console.log("[Socket.io]: ", eventName, ": ", ...args);
+    })
+
     socket.on("joinRoom", ({ chatId }) => {
       socket.join(chatId);
-      console.log(`User ${userId} joined room ${chatId}`);
     });
 
     socket.on("typing", ({ chatId }) => {
       socket.broadcast.to(chatId).emit("typing", { userId });
     });
 
+    socket.on("stopTyping", ({ chatId }) => {
+      socket.broadcast.to(chatId).emit("stopTyping", { userId });
+    });
+
     socket.on("sendMessage", async ({ chatId, content }) => {
       try {
         const chat = await PrivateChat.findById(chatId);
+        const recipient = chat.participants[0].toString() === userId ? chat.participants[1].toString() : chat.participants[0].toString();
         if (chat) {
           const message = new PrivateMessages({
             sender: userId,
@@ -66,12 +77,25 @@ module.exports = (io) => {
           await chat.save();
 
           io.to(chatId).emit("message", message);
-          io.to(userId).emit("UpdateLastMessage", message, chatId);
+          io.to([userId, recipient]).emit("UpdateLastMessage", message, chatId);
         } else {
           console.log("private chat not found");
         }
       } catch (err) {
         console.error("Error sending message:", err);
+      }
+    });
+
+    socket.on("markMessagesAsRead", async ({ chatId }) => {
+      try {
+        await PrivateMessages.updateMany(
+          { chatRoom: chatId, sender: { $ne: userId }, read: false },
+          { read: true }
+        );
+
+        io.to(chatId).emit("messagesSeen", userId);
+      } catch (err) {
+        console.error("Error updating message read status:", err);
       }
     });
 
@@ -81,7 +105,7 @@ module.exports = (io) => {
         lastActive: Date.now(),
       })
         .then(() => {
-          io.emit("userOffline", userId);
+          socket.broadcast.emit("userOffline", userId);
         })
         .catch((err) => console.error("Error updating offline status:", err));
     });
