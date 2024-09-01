@@ -5,6 +5,8 @@ const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { generateAccessToken } = require("../services").Token;
 const CatchAsync = require("../util/catchAsync");
 const bcrypt = require("bcryptjs");
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from users" });
@@ -191,6 +193,59 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   }
 
   res.json({ status: 200, success: true, user, message: "User found" });
+});
+
+
+
+exports.privacyDetails = CatchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;  // Use `req.user.id` for authenticated user ID
+    const user = await User.findById(userId).select('lastLogin twoFA lastDeviceName lastIpAddress');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Format the lastLogin date
+    const now = new Date();
+    const lastLoginDate = new Date(user.lastLogin);
+    const isToday = now.toDateString() === lastLoginDate.toDateString();
+    const formattedTime = lastLoginDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const lastLoginFormatted = isToday ? `Today at ${formattedTime}` : lastLoginDate.toLocaleString();
+
+    res.json({
+      lastSignInTime: lastLoginFormatted,
+      twoFactorEnabled: user.twoFA,
+      lastDeviceName: user.lastDeviceName,
+      lastIpAddress: user.lastIpAddress,
+    });
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+exports.twoFAStatusUpdate= (async (req, res) => {
+  try {
+    const userId = req.user.id;  // Assuming `req.user.id` holds the authenticated user's ID
+    const { twoFactorEnabled } = req.body;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.twoFA = twoFactorEnabled;
+    await user.save();
+
+    res.json({ message: '2FA status updated successfully', twoFactorEnabled: user.twoFA });
+  } catch (error) {
+    console.error('Error updating 2FA status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 exports.checkPassword = CatchAsync(async (req, res) => {
@@ -521,3 +576,150 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   await request.save();
   return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
+
+
+exports.logUser = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).select("-password");
+
+  if (!user) {
+    return res.status(404).json({ status: 404, success: false, message: "User not found" });
+  }
+
+  // Update lastLogin, deviceName, and ipAddress fields
+  user.lastLogin = new Date();
+  user.deviceName = req.headers['user-agent'] || 'Unknown device'; // Get device name from User-Agent
+  user.ipAddress = req.ip; // Get IP address
+
+  await user.save();
+
+  res.json({ status: 200, success: true, message: "User found", user });
+});
+
+
+exports.generateTwoFASecret = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Generate a secret key for the user
+  const secret = speakeasy.generateSecret({ name: `MyApp (${user.email})` });
+
+  // Generate the QR code
+  const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+  // Save the secret to the user record (ensure it's stored securely)
+  user.twoFASecret = secret.base32;
+  await user.save();
+
+  // Return the QR code and secret to the frontend
+  res.json({
+    qrCodeUrl,
+    secret: secret.base32,
+  });
+});
+
+exports.verifyTwoFACode = CatchAsync(async (req, res) => {
+  const { token } = req.body;  // The 6-digit code from the user
+  console.log(token)
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const isVerified = speakeasy.totp.verify({
+    secret: user.twoFASecret,
+    encoding: 'base32',
+    token,
+  });
+
+  if (isVerified) {
+    user.twoFA = true;  // Enable 2FA
+    await user.save();
+    return res.json({ success: true, message: '2FA enabled successfully' });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+});
+
+
+
+
+exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
+  const { token } = req.body;  // The 6-digit code from the user
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const isVerified = speakeasy.totp.verify({
+    secret: user.twoFASecret,
+    encoding: 'base32',
+    token,
+  });
+
+  if (isVerified) {
+
+    const userAgent = req.headers['user-agent'];
+    const device = userAgent || 'Unknown Device';
+
+    // Extract IP address
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+    // Update last login details
+    user.lastLogin = new Date();
+    user.lastDeviceName = device;
+    user.lastIpAddress = ip;
+
+
+    const session = {
+      token,
+      device,
+      ipAddress: ip,
+      lastActive: new Date(),
+    };
+
+    user.sessions.push(session);
+    await user.save();
+
+    return res.json({ success: true, message: '2FA enabled successfully' });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+});
+
+
+exports.getActiveSessions = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('sessions');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user.sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.deleteAllSessions = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.sessions = [];
+    await user.save();
+
+    res.json({ message: 'All sessions cleared' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+};
+

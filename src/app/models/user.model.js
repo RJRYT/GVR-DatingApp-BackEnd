@@ -27,6 +27,14 @@ const notificationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
+
+const SessionSchema = new mongoose.Schema({
+  token: { type: String, required: true },
+  device: { type: String, default: 'Unknown Device' },
+  ipAddress: { type: String, default: 'Unknown IP' },
+  lastActive: { type: Date, default: Date.now },
+});
+
 const UserSchema = mongoose.Schema(
   {
     firstName: { type: String },
@@ -66,7 +74,13 @@ const UserSchema = mongoose.Schema(
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
+    lastLogin: { type: Date, default: Date.now },
+    twoFA : { type: Boolean, default: false },
+    twoFASecret :{type : String},
+    lastDeviceName: { type: String },
+    lastIpAddress: { type: String },
     fake: { type: Boolean },
+    sessions: [SessionSchema],
   },
   { timestamps: true }
 );
