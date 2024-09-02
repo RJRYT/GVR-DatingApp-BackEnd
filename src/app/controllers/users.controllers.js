@@ -695,7 +695,7 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
 
-<<<<<<< HEAD
+
 
 exports.logUser = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id).select("-password");
@@ -842,7 +842,6 @@ exports.deleteAllSessions = async (req, res) => {
   }
 };
 
-=======
 exports.updateShortListedUsers = CatchAsync(async (req, res) => {
   const { userId } = req.body;
   if (!userId)
@@ -961,4 +960,4 @@ exports.listMyProfileViewers = CatchAsync(async (req, res) => {
     viewers: user.viewers,
   });
 });
->>>>>>> 8f2d32818d73936ff998682a22df344da7dddc76
+
