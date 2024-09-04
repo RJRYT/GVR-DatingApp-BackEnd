@@ -16,14 +16,12 @@ module.exports = (io) => {
           process.env.JWT_ACCESS_TOKEN_SECRET,
           async (err, decoded) => {
             if (err) {
-              console.log("JWT verification error:", err);
               return next(new Error("Authentication error"));
             }
             socket.user = decoded;
             const user = await User.findById(socket.user.id, "username");
             if (!user) return next(new Error("Invilid user token"));
             socket.user = user;
-            console.log("[Socket.io]: requesting user: ", user);
             next();
           }
         );
@@ -31,7 +29,6 @@ module.exports = (io) => {
         next(new Error("Authentication token missing"));
       }
     } catch (err) {
-      console.error("Error in socket authentication:", err);
       next(new Error("Internal server error"));
     }
   });
