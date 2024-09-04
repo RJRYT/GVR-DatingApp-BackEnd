@@ -5,3 +5,4 @@ exports.PrivateMessages = require("./Messaging/privatemessages.model");
 exports.GroupMessages = require("./Messaging/groupmessages.model");
 exports.PrivateChat = require("./Messaging/privatechat.model");
 exports.GroupChat = require("./Messaging/groupchat.model");
+exports.MatchPoints = require("./Admin/matchPoints.model");

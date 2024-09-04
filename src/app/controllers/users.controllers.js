@@ -48,7 +48,14 @@ exports.RefreshToken = CatchAsync(async (req, res) => {
 });
 
 exports.CheckUser = CatchAsync(async (req, res) => {
+  const {lat, lon} = req.query;
   const user = await User.findById(req.user.id).select("-password");
+  if(lat && lon){
+    user.currentLocation = {};
+    user.currentLocation.latitude = lat;
+    user.currentLocation.longitude = lon;
+    await user.save();
+  }
   res.json({ status: 200, success: true, message: "User found", user });
 });
 
@@ -112,7 +119,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.dateOfBirth = req.body.dateOfBirth;
   user.gender = req.body.gender;
   user.hobbies = JSON.parse(req.body.hobbies);
-  user.location = req.body.location;
+  user.location = JSON.parse(req.body.location);
   user.interests = JSON.parse(req.body.interests);
   user.smokingHabits = req.body.smokingHabits;
   user.drinkingHabits = req.body.drinkingHabits;
@@ -186,6 +193,8 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 403, success: false, message: "User id is not valid" });
   }
 
+  const chat = await PrivateChat.findOne({ participants: [userId, req.user.id] })
+
   const user = await User.findById(
     userId,
     "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
@@ -202,7 +211,32 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     await user.save();
   }
 
+  if(chat){
+    user.chatId = chat._id;
+  }else{
+    user.chatId = null;
+  }
+
   res.json({ status: 200, success: true, user, message: "User found" });
+});
+
+exports.rejectUserProfile = CatchAsync(async (req, res) => {
+  const { rejectedUserId } = req.body;
+  const userId = req.user.id;
+
+  if(!rejectedUserId) return res.json({ status: 403, success: false, message: "\"rejectedUserId\" is not found in request body" });
+  if (!mongoose.isValidObjectId(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "rejected User id is not valid" });
+  }
+
+  const user = await User.findById(userId);
+  if (user.rejected.includes(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "Profile already rejected" });
+  }
+
+  await User.findByIdAndUpdate(userId, { $push: { rejected: rejectedUserId } });
+  
+  res.status(200).json({ status: 200, success: true, message: "Profile rejected successfully" });
 });
 
 exports.checkPassword = CatchAsync(async (req, res) => {
@@ -415,6 +449,11 @@ exports.fetchFriendRequests = CatchAsync(async (req, res) => {
 
 exports.addFriendRequest = CatchAsync(async (req, res) => {
   const { recipientId } = req.body;
+
+  if (!mongoose.isValidObjectId(recipientId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
   const requestCheck = await FriendRequests.findOne({
     sender: req.user.id,
     recipient: recipientId,
