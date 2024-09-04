@@ -205,6 +205,25 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   res.json({ status: 200, success: true, user, message: "User found" });
 });
 
+exports.rejectUserProfile = CatchAsync(async (req, res) => {
+  const { rejectedUserId } = req.body;
+  const userId = req.user.id;
+
+  if(!rejectedUserId) return res.json({ status: 403, success: false, message: "\"rejectedUserId\" is not found in request body" });
+  if (!mongoose.isValidObjectId(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "rejected User id is not valid" });
+  }
+
+  const user = await User.findById(userId);
+  if (user.rejected.includes(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "Profile already rejected" });
+  }
+
+  await User.findByIdAndUpdate(userId, { $push: { rejected: rejectedUserId } });
+  
+  res.status(200).json({ status: 200, success: true, message: "Profile rejected successfully" });
+});
+
 exports.checkPassword = CatchAsync(async (req, res) => {
   const userId = req.user.id;
   const user = await User.findById(userId, "password");
@@ -405,6 +424,11 @@ exports.fetchFriendRequests = CatchAsync(async (req, res) => {
 
 exports.addFriendRequest = CatchAsync(async (req, res) => {
   const { recipientId } = req.body;
+
+  if (!mongoose.isValidObjectId(recipientId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
   const requestCheck = await FriendRequests.findOne({
     sender: req.user.id,
     recipient: recipientId,

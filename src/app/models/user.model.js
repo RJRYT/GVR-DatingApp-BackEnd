@@ -67,6 +67,7 @@ const UserSchema = mongoose.Schema(
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     shortlists: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    rejected: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
     fake: { type: Boolean },
