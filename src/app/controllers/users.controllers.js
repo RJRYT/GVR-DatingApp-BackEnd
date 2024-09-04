@@ -193,6 +193,8 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 403, success: false, message: "User id is not valid" });
   }
 
+  const chat = await PrivateChat.findOne({ participants: [userId, req.user.id] })
+
   const user = await User.findById(
     userId,
     "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
@@ -207,6 +209,12 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   if (!user.viewers.includes(req.user.id)) {
     user.viewers.addToSet(req.user.id);
     await user.save();
+  }
+
+  if(chat){
+    user.chatId = chat._id;
+  }else{
+    user.chatId = null;
   }
 
   res.json({ status: 200, success: true, user, message: "User found" });
