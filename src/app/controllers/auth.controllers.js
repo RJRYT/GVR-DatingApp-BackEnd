@@ -136,3 +136,69 @@ exports.SendCode = CatchAsync(async (req, res) => {
     });
 });
 
+// Function to verify OTP using Twilio
+async function verifyOtp(phoneNumber, otp) {
+  if (!phoneNumber || !otp) {
+    throw new Error('Phone number and OTP must be provided');
+  }
+
+  try {
+    console.log('Verifying OTP for phone number:', phoneNumber); // Debugging line
+
+    const verificationCheck = await client.verify.v2
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verificationChecks
+      .create({ to: `+91${phoneNumber}`, code: otp });
+
+    if (verificationCheck.status === 'approved') {
+      return { success: true };
+    } else {
+      return { success: false, message: 'Invalid OTP' };
+    }
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    throw new Error('OTP verification failed');
+  }
+}
+
+// Function to handle OTP verification and user update
+exports.verifyCode = CatchAsync(async (req, res) => {
+  const { phoneNumber, otp , userId} = req.body;
+  // const userId = req.userId; // Assuming userId is added to req by authentication middleware
+
+  try {
+    // Debugging: Log request data
+    console.log('Request body:', req.body);
+    console.log('Logged-in user ID:', userId);
+
+    if (!phoneNumber || !otp) {
+      return res.status(400).json({ message: 'Phone number and OTP must be provided' });
+    }
+
+    // Verify OTP using Twilio
+    const result = await verifyOtp(phoneNumber, otp);
+
+    if (result.success) {
+      // Find the user by userId and update their phone number and verification status
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+
+      const user = await User.findById(userId);
+
+      if (user) {
+        user.phoneNumber = phoneNumber;
+        user.numberVerified = true;
+        await user.save();
+        return res.status(200).json({ success : true , message: 'OTP verified and phone number updated successfully' });
+      } else {
+        return res.status(404).json({ success: false ,  message: 'User not found' });
+      }
+    } else {
+      return res.status(400).json({ success: false ,message: result.message });
+    }
+  } catch (error) {
+    console.error('Error in OTP verification route:', error);
+    return res.status(500).json({ success:false , message: 'Internal server error' });
+  }
+});
