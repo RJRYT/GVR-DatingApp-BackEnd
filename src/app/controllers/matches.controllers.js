@@ -26,7 +26,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
       $gte: preferences.AgeRange.min,
       $lte: preferences.AgeRange.max,
     },
-    location: preferences.Location,
+    ["location.name"]: { $in: preferences.Location.map(loc => loc.value) },
     personalInfoSubmitted: true,
     professionalInfoSubmitted: true,
     purposeSubmitted: true,
@@ -36,10 +36,10 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
     matchingQuery["interests.value"] = { $in: preferences.Interests.map(intst => intst.value) };
   }
   if (preferences.Hobbies.length) {
-    matchingQuery["hobbies.value"] = { $in: preferences.Hobbies.map(hby=>hby.value) };
+    matchingQuery["hobbies.value"] = { $in: preferences.Hobbies.map(hby => hby.value) };
   }
   if (preferences.Education.length) {
-    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu=>edu.value) };
+    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu => edu.value) };
   }
   if (preferences.Gender) {
     matchingQuery.gender = preferences.Gender;
@@ -58,7 +58,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
   // Get total matching users count
   const count = await User.countDocuments(matchingQuery);
 
-  matches = await sortAndRankMatches(matches, preferences, matchPoints);
+  matches = await sortAndRankMatches(matches, preferences, matchPoints, user.location);
 
   res.json({
     status: 200,
@@ -180,6 +180,7 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
     await preferences.save();
   }
 
+  let currentLocation = user.location;
   let fetchQuery = {
     _id: { $ne: userId, $nin: [...user.rejected] },
     personalInfoSubmitted: true,
@@ -191,13 +192,14 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
   if (filter) {
     switch (filter) {
       case "nearby":
+        currentLocation = user.currentLocation;
         fetchQuery.location = user.location;
         break;
       case "qualification":
-        fetchQuery["qualification.value"] = { $in: user.qualification.map(qual=>qual.value) };
+        fetchQuery["qualification.value"] = { $in: user.qualification.map(qual => qual.value) };
         break;
       case "interests":
-        fetchQuery["interests.value"] = { $in: user.interests.map(intst=>intst.value) };
+        fetchQuery["interests.value"] = { $in: user.interests.map(intst => intst.value) };
         break;
       default:
         break;
@@ -213,7 +215,7 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
     .lean()
     .exec();
 
-  matches = await sortAndRankMatches(matches, preferences, matchPoints);
+  matches = await sortAndRankMatches(matches, preferences, matchPoints, currentLocation);
 
   const count = await User.countDocuments(fetchQuery);
 
@@ -229,11 +231,12 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
 });
 
 // Utility function
-const sortAndRankMatches = async (matchArray, preferences, adminPoints) => {
+const sortAndRankMatches = async (matchArray, preferences, adminPoints, userLocation) => {
   const matchesWithPercentage = await Promise.all(
     matchArray.map(async (match) => {
       const matchPercentage = await calculateMatchPercentage(match, preferences, adminPoints);
-      return {...match, matchPercentage: matchPercentage.toFixed(2)};
+      const distanceFromUser = await getDistanceFromLatLonInKm(userLocation.latitude, userLocation.longitude, match.latitude, match.longitude);
+      return { ...match, matchPercentage: matchPercentage.toFixed(2), distance: distanceFromUser.toFixed(2) };
     })
   );
 
@@ -385,4 +388,22 @@ const calculateMatchPercentage = async (match, preferences, adminPoints) => {
   const matchPercentage = (totalPoints / possiblePoints) * 100;
 
   return matchPercentage;
+};
+
+// Function to calculate the distance between two lat/lon pairs
+const getDistanceFromLatLonInKm = async (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
+};
+
+const deg2rad = (deg) => {
+  return deg * (Math.PI / 180);
 };
