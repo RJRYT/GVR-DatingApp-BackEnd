@@ -48,7 +48,14 @@ exports.RefreshToken = CatchAsync(async (req, res) => {
 });
 
 exports.CheckUser = CatchAsync(async (req, res) => {
+  const {lat, lon} = req.query;
   const user = await User.findById(req.user.id).select("-password");
+  if(lat && lon){
+    user.currentLocation = {};
+    user.currentLocation.latitude = lat;
+    user.currentLocation.longitude = lon;
+    await user.save();
+  }
   res.json({ status: 200, success: true, message: "User found", user });
 });
 
