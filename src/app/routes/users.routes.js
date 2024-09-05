@@ -40,6 +40,8 @@ router.get("/password/check", AuthMiddleware, UserController.checkPassword);
 
 router.put("/password/change", AuthMiddleware, UserController.changePassword);
 
+router.put("/profile/reject", AuthMiddleware, UserController.rejectUserProfile)
+
 router.post(
   "/notification/markread",
   AuthMiddleware,
