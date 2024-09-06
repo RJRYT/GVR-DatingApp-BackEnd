@@ -78,4 +78,7 @@ SocketIo(io);
 
 app.locals.io = io;
 
+// to pass correct IP Address
+app.set('trust proxy', true);
+
 module.exports = server;

@@ -27,10 +27,11 @@ exports.doLogin = CatchAsync(async (req, res) => {
   const user = await User.findOne(query);
   if (!user) return res.json({ status: 400, success: false, message: "User not found" });
   if (!user.password) return res.json({ status: 400, success: false, message: "Invalid login method. try login with google" });
-
+  
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch)
     return res.json({ status: 400, success: false, message: "Invalid credentials" });
+
 
   const AccessToken = generateAccessToken({ id: user.id });
   const RefreshToken = generateRefreshToken({ id: user.id });
@@ -47,7 +48,38 @@ exports.doLogin = CatchAsync(async (req, res) => {
     sameSite: 'None',
   });
 
-  res.json({ status: 200, success: true, message: "Login successful", AccessToken });
+
+  if (user.twoFA) {
+    // If 2FA is enabled, redirect to the 2FA verification page
+    res.json({ status: 200, success: true, message: "2FA required", twoFA: true });
+  } else {
+
+  
+
+   // Update last login details
+   const userAgent = req.headers['user-agent'];
+   const device = userAgent || 'Unknown Device';
+   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+   user.lastLogin = new Date();
+   user.lastDeviceName = device;
+   user.lastIpAddress = ip;
+
+   if (!user.sessions) {
+    user.sessions = [];
+  }
+   // Add session
+   const session = {
+     token: AccessToken,
+     device,
+     ipAddress: ip,
+     lastActive: new Date(),
+   };
+   user.sessions.push(session);
+   await user.save();
+
+   res.json({ status: 200, success: true, message: "Login successful", AccessToken });
+  }
 });
 
 exports.doLogout = CatchAsync(async (req, res) => {
@@ -103,9 +135,15 @@ exports.PassportVerify = passport.authenticate("google", {
   failureRedirect: process.env.FRONTEND_URL + "/login?error=GoogleOAuthFailed",
 });
 
-exports.GoogleCallBack = (req, res) => {
+exports.GoogleCallBack = CatchAsync( async(req, res) => {
   const AccessToken = generateAccessToken({ id: req.user.id });
   const RefreshToken = generateRefreshToken({ id: req.user.id });
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
 
   res.cookie("accessToken", AccessToken, {
     httpOnly: true,
@@ -118,8 +156,41 @@ exports.GoogleCallBack = (req, res) => {
     secure: true,
     sameSite: 'None',
   });
-  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
-};
+
+  if(user.twoFA === false){
+
+
+    const userAgent = req.headers['user-agent'];
+    const device = userAgent || 'Unknown Device';
+
+    // Extract IP address
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+    // Update last login details
+    user.lastLogin = new Date();
+    user.lastDeviceName = device;
+    user.lastIpAddress = ip;
+
+   if (!user.sessions) {
+      user.sessions = [];
+    }
+
+
+    const session = {
+      token : AccessToken,
+      device,
+      ipAddress: ip,
+      lastActive: new Date(),
+    };
+
+    user.sessions.push(session);
+
+    console.log(user)
+    await user.save();
+
+  }
+  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}&2fa=${user.twoFA}`);
+});
 
 exports.SendCode = CatchAsync(async (req, res) => {
   const { phoneNumber } = req.body;
