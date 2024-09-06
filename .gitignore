@@ -132,3 +132,4 @@ dist
 #Exclude these json files
 preferences.json
 users.json
+demo
