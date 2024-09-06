@@ -39,7 +39,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
     matchingQuery["hobbies.value"] = { $in: preferences.Hobbies.map(hby => hby.value) };
   }
   if (preferences.Education.length) {
-    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu => edu.value) };
+    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu => edu.value) }; 
   }
   if (preferences.Gender) {
     matchingQuery.gender = preferences.Gender;
