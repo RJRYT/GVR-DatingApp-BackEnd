@@ -48,7 +48,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
   // Find users that match the preferences
   let matches = await User.find(
     matchingQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel isOnline"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -208,7 +208,7 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
 
   let matches = await User.find(
     fetchQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel isOnline"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)
