@@ -37,25 +37,25 @@ module.exports = (io) => {
     const userId = socket.user.userId;
     socket.join(userId);
 
-    try {
-      const token = req.headers.authorization.split(' ')[1];
-      //const user = await User.findOne({ 'sessions.token': token });
-      const user = User.findById(userId);
+    // try {
+    //   const token = req.headers.authorization.split(' ')[1];
+    //   //const user = await User.findOne({ 'sessions.token': token });
+    //   const user = User.findById(userId);
   
-      if (user) {
-        const session = user.sessions.find((session) => session.token === token);
-        if (session) {
-          session.lastActive = new Date();
-          user.isOnline = true;
-           user.save();
-           socket.broadcast.emit("userOnline", userId);
-        }
-      }
-      next();
-    } catch (err) {
-      console.error('Error updating online status:', err);
-      next(err);
-    }
+    //   if (user) {
+    //     const session = user.sessions.find((session) => session.token === token);
+    //     if (session) {
+    //       session.lastActive = new Date();
+    //       user.isOnline = true;
+    //        user.save();
+    //        socket.broadcast.emit("userOnline", userId);
+    //     }
+    //   }
+    //   next();
+    // } catch (err) {
+    //   console.error('Error updating online status:', err);
+    //   next(err);
+    // }
 
     User.findByIdAndUpdate(userId, { isOnline: true, lastActive: Date.now() })
       .then(() => {
