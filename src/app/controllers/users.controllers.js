@@ -807,6 +807,8 @@ exports.verifyTwoFACode = CatchAsync(async (req, res) => {
 
 exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
   const { token } = req.body;  // The 6-digit code from the user
+  
+  const {accessToken, refreshToken} = req.cookies;
   const user = await User.findById(req.user.id);
 
   if (!user) {
@@ -820,7 +822,7 @@ exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
   });
 
   if (isVerified) {
-
+    console.log("req.cookies",req.cookies)
     const userAgent = req.headers['user-agent'];
     const device = userAgent || 'Unknown Device';
 
@@ -831,10 +833,24 @@ exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
     user.lastLogin = new Date();
     user.lastDeviceName = device;
     user.lastIpAddress = ip;
+    
+  res.cookie("accessToken", user.accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+
+  res.cookie("refreshToken", user.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+
 
 
     const session = {
-      token,
+      accessToken,
+      refreshToken,
       device,
       ipAddress: ip,
       lastActive: new Date(),

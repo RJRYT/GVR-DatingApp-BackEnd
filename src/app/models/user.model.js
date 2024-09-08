@@ -29,7 +29,8 @@ const notificationSchema = new mongoose.Schema({
 
 
 const SessionSchema = new mongoose.Schema({
-  token: { type: String, required: true },
+  accessToken: { type: String },
+  refreshToken :{ type: String },
   device: { type: String, default: 'Unknown Device' },
   ipAddress: { type: String, default: 'Unknown IP' },
   lastActive: { type: Date, default: Date.now },
@@ -94,6 +95,9 @@ const UserSchema = mongoose.Schema(
     lastIpAddress: { type: String },
     fake: { type: Boolean },
     sessions: [SessionSchema],
+    accessToken: { type: String },
+    refreshToken :{ type: String },
+
   },
   { timestamps: true }
 );

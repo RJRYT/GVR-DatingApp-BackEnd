@@ -145,18 +145,6 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
   }
 
 
-  res.cookie("accessToken", AccessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
-
-  res.cookie("refreshToken", RefreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
-
   if(user.twoFA === false){
 
 
@@ -170,6 +158,8 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
     user.lastLogin = new Date();
     user.lastDeviceName = device;
     user.lastIpAddress = ip;
+    user.accessToken = AccessToken;
+    user.refreshToken = RefreshToken;
 
    if (!user.sessions) {
       user.sessions = [];
@@ -177,7 +167,8 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
 
 
     const session = {
-      token : AccessToken,
+      accessToken: AccessToken,
+      refreshToken: RefreshToken,
       device,
       ipAddress: ip,
       lastActive: new Date(),
@@ -188,8 +179,36 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
     console.log(user)
     await user.save();
 
+    res.cookie("2fa",user.twoFA, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+    });
+  
+    res.cookie("accessToken", AccessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+    });
+  
+    res.cookie("refreshToken", RefreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+    });
+    res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
   }
-  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}&2fa=${user.twoFA}`);
+  else{
+    
+    res.cookie("2fa", twoFA, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+    });
+ 
+
+  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
+}
 });
 
 exports.SendCode = CatchAsync(async (req, res) => {
