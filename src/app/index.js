@@ -1,5 +1,4 @@
 const express = require("express");
-const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const cron = require("node-cron");
@@ -27,18 +26,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Cookie-parser
 app.use(cookieParser());
 
-// Express session
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "mostsecuredsecret",
-    resave: false,
-    saveUninitialized: false,
-  })
-);
-
 // Passport middleware
 app.use(passport.initialize());
-app.use(passport.session());
 
 // Connect to database
 connectDatabase();

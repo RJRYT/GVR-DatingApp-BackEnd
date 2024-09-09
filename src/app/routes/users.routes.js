@@ -106,7 +106,7 @@ router.get('/privacy', AuthMiddleware, UserController.privacyDetails);
 router.post('/privacy/2fa', AuthMiddleware, UserController.twoFAStatusUpdate);
 router.get('/privacy/2fa/generate', AuthMiddleware, UserController.generateTwoFASecret);
 router.post('/privacy/2fa/verify', AuthMiddleware, UserController.verifyTwoFACode);
-router.post('/verify-2fa', AuthMiddleware, UserController.verifyTwoFAToken);
+router.post('/verify-2fa', UserController.verifyTwoFAToken);
 router.get('/sessions', AuthMiddleware, UserController.getActiveSessions);
 router.delete('/sessions', AuthMiddleware, UserController.deleteAllSessions);
 

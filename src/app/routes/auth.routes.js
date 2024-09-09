@@ -1,5 +1,6 @@
 const express = require('express');
 const { AuthController } = require("../controllers");
+const { AuthMiddleware } = require("../middlewares");
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ router.post("/email/login", AuthController.doLogin);
 router.post("/email/register", AuthController.doRegister);
 
 //Logout
-router.post("/logout", AuthController.doLogout);
+router.post("/logout", AuthMiddleware, AuthController.doLogout);
 
 // Google Authentication
 router.get("/google/login", AuthController.GoogleLogin);
@@ -23,7 +24,5 @@ router.post("/number/sendotp", AuthController.SendCode);
 
 // OTP Verify
 router.post("/number/verifyotp", AuthController.verifyCode)
-
-
 
 module.exports = router;

@@ -1,8 +1,8 @@
-const { User, PrivateMessages, PrivateChat } = require("../models");
+const { User, PrivateMessages, PrivateChat, Session } = require("../models");
 const jwt = require("jsonwebtoken");
 
 module.exports = (io) => {
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const cookies = socket.request.headers.cookie;
       const token = cookies
@@ -11,20 +11,20 @@ module.exports = (io) => {
         ?.split("=")[1];
 
       if (token) {
-        jwt.verify(
-          token,
-          process.env.JWT_ACCESS_TOKEN_SECRET,
-          async (err, decoded) => {
-            if (err) {
-              return next(new Error("Authentication error"));
-            }
-            socket.user = decoded;
-            const user = await User.findById(socket.user.id, "username");
-            if (!user) return next(new Error("Invilid user token"));
-            socket.user = user;
-            next();
-          }
-        );
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN_SECRET);
+        if (!decoded.sessionId)
+          return next(new Error("Session id not found"));
+
+        const session = await Session.findOne({ sessionId: decoded.sessionId });
+        if (!session)
+          return next(new Error("Session is no longer active."));
+
+        session.lastActiveAt = Date.now();
+        await session.save();
+        const user = await User.findById(decoded.id, "username").lean();
+        if (!user) return next(new Error("Invilid user"));
+        socket.user = {...user, ...decoded};
+        next();
       } else {
         next(new Error("Authentication token missing"));
       }
@@ -34,28 +34,8 @@ module.exports = (io) => {
   });
 
   io.on('connection', (socket) => {
-    const userId = socket.user.userId;
+    const userId = socket.user.id;
     socket.join(userId);
-
-    // try {
-    //   const token = req.headers.authorization.split(' ')[1];
-    //   //const user = await User.findOne({ 'sessions.token': token });
-    //   const user = User.findById(userId);
-  
-    //   if (user) {
-    //     const session = user.sessions.find((session) => session.token === token);
-    //     if (session) {
-    //       session.lastActive = new Date();
-    //       user.isOnline = true;
-    //        user.save();
-    //        socket.broadcast.emit("userOnline", userId);
-    //     }
-    //   }
-    //   next();
-    // } catch (err) {
-    //   console.error('Error updating online status:', err);
-    //   next(err);
-    // }
 
     User.findByIdAndUpdate(userId, { isOnline: true, lastActive: Date.now() })
       .then(() => {
