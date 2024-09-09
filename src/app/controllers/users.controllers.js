@@ -1,11 +1,12 @@
-const { User, FriendRequests, PrivateChat } = require("../models");
+const { User, FriendRequests, PrivateChat, Session } = require("../models");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const { generateAccessToken } = require("../services").Token;
+const { generateAccessToken, generateRefreshToken } = require("../services").Token;
 const CatchAsync = require("../util/catchAsync");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 
@@ -23,36 +24,56 @@ exports.RefreshToken = CatchAsync(async (req, res) => {
     });
   }
 
-  jwt.verify(
-    refreshToken,
-    process.env.JWT_REFRESH_TOKEN_SECRET,
-    (err, user) => {
-      if (err)
-        return res
-          .status(403)
-          .json({ status: 403, success: false, message: "Server error" });
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET);
 
-      const accessToken = generateAccessToken({ id: user.id });
-      res.cookie("accessToken", accessToken, {
+    if (!decoded.sessionId)
+      return res.status(403).json({ status: 403, success: false, message: "Session id not found" });
+
+    // Verify if session is still active
+    const session = await Session.findOne({ sessionId: decoded.sessionId });
+
+    if (!session)
+      return res.status(403).json({ status: 403, success: false, message: 'Session expired. Please log in again.' });
+
+    const accessToken = generateAccessToken({ id: session.userId, sessionId: session.sessionId });
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+
+    const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+    const remainingTime = decoded.exp - currentTime; // Time left before expiration in seconds
+
+    const timeThreshold = 2 * 24 * 60 * 60; // 2 days threshold
+
+    if (remainingTime < timeThreshold) {
+      const refreshToken = generateRefreshToken({ id: session.userId, sessionId: session.sessionId });
+      res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: true,
-        sameSite: "None",
-      });
-
-      res.json({
-        status: 200,
-        success: true,
-        message: "Token regenerated",
-        accessToken,
+        sameSite: 'None',
       });
     }
-  );
+
+    res.json({
+      status: 200,
+      success: true,
+      message: "Token regenerated",
+      accessToken,
+    });
+  } catch (error) {
+    return res
+      .status(403)
+      .json({ status: 403, success: false, message: 'Invalid refresh token.' });
+  }
 });
 
 exports.CheckUser = CatchAsync(async (req, res) => {
-  const {lat, lon} = req.query;
+  const { lat, lon } = req.query;
   const user = await User.findById(req.user.id).select("-password");
-  if(lat && lon){
+  if (lat && lon) {
     user.currentLocation = {};
     user.currentLocation.latitude = lat;
     user.currentLocation.longitude = lon;
@@ -213,9 +234,9 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     await user.save();
   }
 
-  if(chat){
+  if (chat) {
     user.chatId = chat._id;
-  }else{
+  } else {
     user.chatId = null;
   }
 
@@ -226,7 +247,7 @@ exports.rejectUserProfile = CatchAsync(async (req, res) => {
   const { rejectedUserId } = req.body;
   const userId = req.user.id;
 
-  if(!rejectedUserId) return res.json({ status: 403, success: false, message: "\"rejectedUserId\" is not found in request body" });
+  if (!rejectedUserId) return res.json({ status: 403, success: false, message: "\"rejectedUserId\" is not found in request body" });
   if (!mongoose.isValidObjectId(rejectedUserId)) {
     return res.json({ status: 403, success: false, message: "rejected User id is not valid" });
   }
@@ -237,17 +258,15 @@ exports.rejectUserProfile = CatchAsync(async (req, res) => {
   }
 
   await User.findByIdAndUpdate(userId, { $push: { rejected: rejectedUserId } });
-  
+
   res.status(200).json({ status: 200, success: true, message: "Profile rejected successfully" });
 });
 
-
-
 exports.privacyDetails = CatchAsync(async (req, res) => {
   try {
-    const userId = req.user.id;  // Use `req.user.id` for authenticated user ID
+    const userId = req.user.id;
     const user = await User.findById(userId).select('lastLogin twoFA lastDeviceName lastIpAddress');
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -271,11 +290,9 @@ exports.privacyDetails = CatchAsync(async (req, res) => {
   }
 });
 
-
-
-exports.twoFAStatusUpdate= (async (req, res) => {
+exports.twoFAStatusUpdate = (async (req, res) => {
   try {
-    const userId = req.user.id;  // Assuming `req.user.id` holds the authenticated user's ID
+    const userId = req.user.id;
     const { twoFactorEnabled } = req.body;
 
     const user = await User.findById(userId);
@@ -416,7 +433,6 @@ exports.updateProfile = CatchAsync(async (req, res) => {
   }
 });
 
-
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
   const { notificationId } = req.body;
 
@@ -435,7 +451,6 @@ exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
     message: "Notification marked as read",
   });
 });
-
 
 exports.deleteNotification = CatchAsync(async (req, res) => {
   const { notificationId } = req.body;
@@ -744,26 +759,6 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
 
-
-
-exports.logUser = CatchAsync(async (req, res) => {
-  const user = await User.findById(req.user.id).select("-password");
-
-  if (!user) {
-    return res.status(404).json({ status: 404, success: false, message: "User not found" });
-  }
-
-  // Update lastLogin, deviceName, and ipAddress fields
-  user.lastLogin = new Date();
-  user.deviceName = req.headers['user-agent'] || 'Unknown device'; // Get device name from User-Agent
-  user.ipAddress = req.ip; // Get IP address
-
-  await user.save();
-
-  res.json({ status: 200, success: true, message: "User found", user });
-});
-
-
 exports.generateTwoFASecret = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id);
 
@@ -812,82 +807,75 @@ exports.verifyTwoFACode = CatchAsync(async (req, res) => {
   }
 });
 
-
-
-
 exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
-  const { token } = req.body;  // The 6-digit code from the user
-  console.log(req.cookies)
-  const {userid} = req.cookies;
-  const user = await User.findById(userid);
+  const { token, code } = req.body;
 
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
-  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN_SECRET);
+    const user = await User.findById(decoded.id);
 
-  const isVerified = speakeasy.totp.verify({
-    secret: user.twoFASecret,
-    encoding: 'base32',
-    token,
-  });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-  if (isVerified) {
-    console.log("req.cookies",req.cookies)
-    const userAgent = req.headers['user-agent'];
-    const device = userAgent || 'Unknown Device';
+    const isVerified = speakeasy.totp.verify({
+      secret: user.twoFASecret,
+      encoding: 'base32',
+      token: code,
+    });
 
-    // Extract IP address
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    if (isVerified) {
+      // Update last login details
+      const userAgent = req.headers['user-agent'];
+      const deviceInfo = userAgent || 'Unknown Device';
+      const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
-    // Update last login details
-    user.lastLogin = new Date();
-    user.lastDeviceName = device;
-    user.lastIpAddress = ip;
-    
-  res.cookie("accessToken", user.accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
+      // Generate session ID
+      const sessionId = crypto.randomBytes(16).toString('hex');
 
-  res.cookie("refreshToken", user.refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
+      const AccessToken = generateAccessToken({ id: user.id, sessionId });
+      const RefreshToken = generateRefreshToken({ id: user.id, sessionId });
 
-  res.cookie("2fa", "false", {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
+      const session = new Session({
+        userId: user.id || user._id,
+        sessionId,
+        deviceInfo,
+        ipAddress
+      });
+      await session.save();
 
-    const session = {
-      "accessToken": user.accessToken,
-      "refreshToken":user.refreshToken,
-      device,
-      ipAddress: ip,
-      lastActive: new Date(),
-    };
+      user.lastLogin = new Date();
+      user.lastDeviceName = deviceInfo;
+      user.lastIpAddress = ipAddress;
+      await user.save();
 
-    user.sessions.push(session);
-    await user.save();
+      res.cookie("accessToken", AccessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+      });
 
-    return res.json({ success: true, message: '2FA enabled successfully', token: user.accessToken });
-  } else {
-    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+      res.cookie("refreshToken", RefreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+      });
+
+      return res.json({ success: true, message: '2FA enabled successfully', token: AccessToken });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 500, success: false, message: "Token is not valid" });
   }
 });
 
 
 exports.getActiveSessions = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('sessions');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const sessions = await Session.find({ userId: req.user.id });
 
-    res.json(user.sessions);
+    res.json(sessions);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server error');
@@ -896,13 +884,10 @@ exports.getActiveSessions = async (req, res) => {
 
 exports.deleteAllSessions = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const userId = req.user.id;
+    const currentSessionId = req.user.sessionId;
 
-    user.sessions = [];
-    await user.save();
+    await Session.deleteMany({ userId, sessionId: { $ne: currentSessionId } });
 
     res.json({ message: 'All sessions cleared' });
   } catch (err) {

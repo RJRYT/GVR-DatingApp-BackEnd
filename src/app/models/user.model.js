@@ -27,15 +27,6 @@ const notificationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-
-const SessionSchema = new mongoose.Schema({
-  accessToken: { type: String },
-  refreshToken :{ type: String },
-  device: { type: String, default: 'Unknown Device' },
-  ipAddress: { type: String, default: 'Unknown IP' },
-  lastActive: { type: Date, default: Date.now },
-});
-
 const UserSchema = mongoose.Schema(
   {
     firstName: { type: String },
@@ -93,11 +84,7 @@ const UserSchema = mongoose.Schema(
     twoFASecret :{type : String},
     lastDeviceName: { type: String },
     lastIpAddress: { type: String },
-    fake: { type: Boolean },
-    sessions: [SessionSchema],
-    accessToken: { type: String },
-    refreshToken :{ type: String },
-
+    fake: { type: Boolean }
   },
   { timestamps: true }
 );

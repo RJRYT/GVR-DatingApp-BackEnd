@@ -1,4 +1,5 @@
 exports.User = require("./user.model");
+exports.Session = require("./session.model");
 exports.Preference = require("./preferences.model");
 exports.FriendRequests = require("./friendRequest.model");
 exports.PrivateMessages = require("./Messaging/privatemessages.model");

@@ -1,7 +1,8 @@
 const passport = require("passport");
 const bcrypt = require("bcryptjs");
-const { User } = require("../models");
+const { User, Session } = require("../models");
 const CatchAsync = require("../util/catchAsync");
+const crypto = require("crypto");
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -13,13 +14,11 @@ const client = new twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
-
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from auth" });
 };
 
 exports.doLogin = CatchAsync(async (req, res) => {
-  console.log("in dologin")
   const { email, password, phoneNumber } = req.body;
   let query = {};
   if (email) query.email = email;
@@ -28,44 +27,41 @@ exports.doLogin = CatchAsync(async (req, res) => {
   const user = await User.findOne(query);
   if (!user) return res.json({ status: 400, success: false, message: "User not found" });
   if (!user.password) return res.json({ status: 400, success: false, message: "Invalid login method. try login with google" });
-  
+
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch)
     return res.json({ status: 400, success: false, message: "Invalid credentials" });
 
-
-  const AccessToken = generateAccessToken({ id: user.id });
-  const RefreshToken = generateRefreshToken({ id: user.id });
-
   if (user.twoFA) {
     // If 2FA is enabled, redirect to the 2FA verification page
-    res.json({ status: 200, success: true, message: "2FA required", twoFA: true });
-  } else {
-
-
-   // Update last login details
-   const userAgent = req.headers['user-agent'];
-   const device = userAgent || 'Unknown Device';
-   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
-   user.lastLogin = new Date();
-   user.lastDeviceName = device;
-   user.lastIpAddress = ip;
-
-   if (!user.sessions) {
-    user.sessions = [];
+    const TempToken = generateAccessToken({ id: user.id });
+    return res.json({ status: 200, success: true, message: "2FA required", twoFA: true, token: TempToken });
   }
-   // Add session
-   const session = {
-     token: AccessToken,
-     device,
-     ipAddress: ip,
-     lastActive: new Date(),
-   };
-   user.sessions.push(session);
-   await user.save();
+  // Update last login details
+  const userAgent = req.headers['user-agent'];
+  const deviceInfo = userAgent || 'Unknown Device';
+  const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
-   res.cookie("accessToken", AccessToken, {
+  // Generate session ID
+  const sessionId = crypto.randomBytes(16).toString('hex');
+
+  const AccessToken = generateAccessToken({ id: user.id, sessionId });
+  const RefreshToken = generateRefreshToken({ id: user.id, sessionId });
+
+  const session = new Session({
+    userId: user.id || user._id,
+    sessionId,
+    deviceInfo,
+    ipAddress
+  });
+  await session.save();
+
+  user.lastLogin = new Date();
+  user.lastDeviceName = deviceInfo;
+  user.lastIpAddress = ipAddress;
+  await user.save();
+
+  res.cookie("accessToken", AccessToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'None',
@@ -77,14 +73,13 @@ exports.doLogin = CatchAsync(async (req, res) => {
     sameSite: 'None',
   });
 
-   res.json({ status: 200, success: true, message: "Login successful", AccessToken });
-  }
+  res.json({ status: 200, success: true, message: "Login successful", AccessToken, RefreshToken });
 });
 
 exports.doLogout = CatchAsync(async (req, res) => {
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
-  res.clearCookie("2fa");
+  await Session.deleteOne({ sessionId: req.user.sessionId });
   res.json({ status: 200, success: true, message: "Logout successful" });
 });
 
@@ -96,126 +91,109 @@ exports.doRegister = CatchAsync(async (req, res) => {
   });
   if (user) return res.json({ status: 400, success: false, message: "User already exists" });
 
-  client.verify.v2
-    .services(process.env.TWILIO_SERVICE_SID)
-    .verificationChecks.create({ to: `+91${phoneNumber}`, code: otp })
-    .then(async (verification_check) => {
-      if (verification_check.status) {
-        user = new User({ username, email, password, phoneNumber });
-        const AccessToken = generateAccessToken({ id: user.id });
-        const RefreshToken = generateRefreshToken({ id: user.id });
+  const result = await verifyOtp(phoneNumber, otp);
 
-        res.cookie("accessToken", AccessToken, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'None',
-        });
+  if (!result.success) {
+    return res.status(400).json({ success: false, message: result.message });
+  }
 
-        res.cookie("refreshToken", RefreshToken, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'None',
-        });
-        user.numberVerified = true;
-        await user.save();
-        res.json({ status: 200, success: true, message: "Registration completed", AccessToken });
-      }
-    })
-    .catch((err) => {
-      console.log("Twilio verify error: ", err);
-      res.json({ status: 400, success: false, message: "OTP expired/invalid. please generate a new one" });
-    })
+  user = new User({ username, email, password, phoneNumber });
+
+  // Update last login details
+  const userAgent = req.headers['user-agent'];
+  const deviceInfo = userAgent || 'Unknown Device';
+  const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+  // Generate session ID
+  const sessionId = crypto.randomBytes(16).toString('hex');
+
+  const AccessToken = generateAccessToken({ id: user.id, sessionId });
+  const RefreshToken = generateRefreshToken({ id: user.id, sessionId });
+
+  const session = new Session({
+    userId: user.id || user._id,
+    sessionId,
+    deviceInfo,
+    ipAddress
+  });
+  await session.save();
+
+  user.lastLogin = new Date();
+  user.lastDeviceName = deviceInfo;
+  user.lastIpAddress = ipAddress;
+
+  res.cookie("accessToken", AccessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+
+  res.cookie("refreshToken", RefreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+  user.numberVerified = true;
+  await user.save();
+  res.json({ status: 200, success: true, message: "Registration completed", AccessToken, RefreshToken });
 });
 
 exports.GoogleLogin = passport.authenticate("google", {
   scope: ["profile", "email"],
+  session: false,
 });
 
 exports.PassportVerify = passport.authenticate("google", {
   failureRedirect: process.env.FRONTEND_URL + "/login?error=GoogleOAuthFailed",
+  session: false,
 });
 
-exports.GoogleCallBack = CatchAsync( async(req, res) => {
-  console.log("in googleCallBack")
-  const AccessToken = generateAccessToken({ id: req.user.id });
-  const RefreshToken = generateRefreshToken({ id: req.user.id });
-
+exports.GoogleCallBack = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
   }
-
-
-  if(user.twoFA === false){
-
-
-    const userAgent = req.headers['user-agent'];
-    const device = userAgent || 'Unknown Device';
-
-    // Extract IP address
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
+  if (!user.twoFA) {
     // Update last login details
+    const userAgent = req.headers['user-agent'];
+    const deviceInfo = userAgent || 'Unknown Device';
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+    // Generate session ID
+    const sessionId = crypto.randomBytes(16).toString('hex');
+
+    const AccessToken = generateAccessToken({ id: user.id, sessionId });
+    const RefreshToken = generateRefreshToken({ id: user.id, sessionId });
+
+    const session = new Session({
+      userId: user.id || user._id,
+      sessionId,
+      deviceInfo,
+      ipAddress
+    });
+    await session.save();
+
     user.lastLogin = new Date();
-    user.lastDeviceName = device;
-    user.lastIpAddress = ip;
-
-
-   if (!user.sessions) {
-      user.sessions = [];
-    }
-
-
-    const session = {
-      accessToken: AccessToken,
-      refreshToken: RefreshToken,
-      device,
-      ipAddress: ip,
-      lastActive: new Date(),
-    };
-
-    user.sessions.push(session);
-
-    console.log(user)
+    user.lastDeviceName = deviceInfo;
+    user.lastIpAddress = ipAddress;
     await user.save();
 
-    res.cookie("2fa",user.twoFA, {
-      secure: true,
-      sameSite: 'None',
-    });
-  
     res.cookie("accessToken", AccessToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'None',
     });
-  
+
     res.cookie("refreshToken", RefreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'None',
     });
-    res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
+
+    return res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
   }
-  else{
-    
-    user.accessToken = AccessToken;
-    user.refreshToken = RefreshToken;
-    await user.save();
-
-    res.cookie("2fa", user.twoFA, {
-      secure: true,
-      sameSite: 'None',
-    });
-
-    res.cookie("userid", user.id, {
-      secure: true,
-      sameSite: 'None',
-    });
- 
-
-  res.redirect(`${process.env.FRONTEND_URL}/login?token=${AccessToken}`);
-}
+  const TempToken = generateAccessToken({ id: user.id });
+  res.redirect(`${process.env.FRONTEND_URL}/login/2fa/?token=${TempToken}`);
 });
 
 exports.SendCode = CatchAsync(async (req, res) => {
@@ -224,7 +202,6 @@ exports.SendCode = CatchAsync(async (req, res) => {
     .services(process.env.TWILIO_SERVICE_SID)
     .verifications.create({ to: `+91${phoneNumber}`, channel: "sms" })
     .then((verification) => {
-      console.log(verification.sid);
       res.json({ status: 200, success: true, message: "OTP sent successfully" });
     })
     .catch((error) => {
@@ -247,6 +224,8 @@ async function verifyOtp(phoneNumber, otp) {
       .verificationChecks
       .create({ to: `+91${phoneNumber}`, code: otp });
 
+    console.log("otp verify output: ", verificationCheck)
+
     if (verificationCheck.status === 'approved') {
       return { success: true };
     } else {
@@ -260,19 +239,14 @@ async function verifyOtp(phoneNumber, otp) {
 
 // Function to handle OTP verification and user update
 exports.verifyCode = CatchAsync(async (req, res) => {
-  const { phoneNumber, otp , userId} = req.body;
-  // const userId = req.userId; // Assuming userId is added to req by authentication middleware
+  const { phoneNumber, otp } = req.body;
+  const userId = req.user.id;
 
   try {
-    // Debugging: Log request data
-    console.log('Request body:', req.body);
-    console.log('Logged-in user ID:', userId);
-
     if (!phoneNumber || !otp) {
       return res.status(400).json({ message: 'Phone number and OTP must be provided' });
     }
 
-    // Verify OTP using Twilio
     const result = await verifyOtp(phoneNumber, otp);
 
     if (result.success) {
@@ -287,15 +261,15 @@ exports.verifyCode = CatchAsync(async (req, res) => {
         user.phoneNumber = phoneNumber;
         user.numberVerified = true;
         await user.save();
-        return res.status(200).json({ success : true , message: 'OTP verified and phone number updated successfully' });
+        return res.status(200).json({ success: true, message: 'OTP verified and phone number updated successfully' });
       } else {
-        return res.status(404).json({ success: false ,  message: 'User not found' });
+        return res.status(404).json({ success: false, message: 'User not found' });
       }
     } else {
-      return res.status(400).json({ success: false ,message: result.message });
+      return res.status(400).json({ success: false, message: result.message });
     }
   } catch (error) {
     console.error('Error in OTP verification route:', error);
-    return res.status(500).json({ success:false , message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
