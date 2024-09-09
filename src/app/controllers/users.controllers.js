@@ -807,9 +807,9 @@ exports.verifyTwoFACode = CatchAsync(async (req, res) => {
 
 exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
   const { token } = req.body;  // The 6-digit code from the user
-  
-  const {accessToken, refreshToken} = req.cookies;
-  const user = await User.findById(req.user.id);
+  console.log(req.cookies)
+  const {userid} = req.cookies;
+  const user = await User.findById(userid);
 
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
@@ -846,11 +846,15 @@ exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
     sameSite: 'None',
   });
 
-
+  res.cookie("2fa", "false", {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
 
     const session = {
-      accessToken,
-      refreshToken,
+      "accessToken": user.accessToken,
+      "refreshToken":user.refreshToken,
       device,
       ipAddress: ip,
       lastActive: new Date(),
@@ -859,7 +863,7 @@ exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
     user.sessions.push(session);
     await user.save();
 
-    return res.json({ success: true, message: '2FA enabled successfully' });
+    return res.json({ success: true, message: '2FA enabled successfully', token: user.accessToken });
   } else {
     return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
   }

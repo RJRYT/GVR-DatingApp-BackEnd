@@ -19,6 +19,7 @@ exports.test = (req, res) => {
 };
 
 exports.doLogin = CatchAsync(async (req, res) => {
+  console.log("in dologin")
   const { email, password, phoneNumber } = req.body;
   let query = {};
   if (email) query.email = email;
@@ -36,25 +37,11 @@ exports.doLogin = CatchAsync(async (req, res) => {
   const AccessToken = generateAccessToken({ id: user.id });
   const RefreshToken = generateRefreshToken({ id: user.id });
 
-  res.cookie("accessToken", AccessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
-
-  res.cookie("refreshToken", RefreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-  });
-
-
   if (user.twoFA) {
     // If 2FA is enabled, redirect to the 2FA verification page
     res.json({ status: 200, success: true, message: "2FA required", twoFA: true });
   } else {
 
-  
 
    // Update last login details
    const userAgent = req.headers['user-agent'];
@@ -78,6 +65,18 @@ exports.doLogin = CatchAsync(async (req, res) => {
    user.sessions.push(session);
    await user.save();
 
+   res.cookie("accessToken", AccessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+
+  res.cookie("refreshToken", RefreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+
    res.json({ status: 200, success: true, message: "Login successful", AccessToken });
   }
 });
@@ -85,6 +84,7 @@ exports.doLogin = CatchAsync(async (req, res) => {
 exports.doLogout = CatchAsync(async (req, res) => {
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
+  res.clearCookie("2fa");
   res.json({ status: 200, success: true, message: "Logout successful" });
 });
 
@@ -136,6 +136,7 @@ exports.PassportVerify = passport.authenticate("google", {
 });
 
 exports.GoogleCallBack = CatchAsync( async(req, res) => {
+  console.log("in googleCallBack")
   const AccessToken = generateAccessToken({ id: req.user.id });
   const RefreshToken = generateRefreshToken({ id: req.user.id });
 
@@ -158,8 +159,7 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
     user.lastLogin = new Date();
     user.lastDeviceName = device;
     user.lastIpAddress = ip;
-    user.accessToken = AccessToken;
-    user.refreshToken = RefreshToken;
+
 
    if (!user.sessions) {
       user.sessions = [];
@@ -180,7 +180,6 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
     await user.save();
 
     res.cookie("2fa",user.twoFA, {
-      httpOnly: true,
       secure: true,
       sameSite: 'None',
     });
@@ -200,8 +199,16 @@ exports.GoogleCallBack = CatchAsync( async(req, res) => {
   }
   else{
     
-    res.cookie("2fa", twoFA, {
-      httpOnly: true,
+    user.accessToken = AccessToken;
+    user.refreshToken = RefreshToken;
+    await user.save();
+
+    res.cookie("2fa", user.twoFA, {
+      secure: true,
+      sameSite: 'None',
+    });
+
+    res.cookie("userid", user.id, {
       secure: true,
       sameSite: 'None',
     });
