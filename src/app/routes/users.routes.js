@@ -79,12 +79,13 @@ router.put(
   AuthMiddleware,
   UserController.cancelFriendRequest
 );
+
 router.put(
   "/update/profile",
   AuthMiddleware,
   UploadMiddleware.fields([
     { name: "images", maxCount: 5 },
-    { name: "profilepic", maxCount: 1 },
+    { name: "profilePic", maxCount: 1 },
     { name: "shortreels", maxCount: 1 },
   ]),
   UserController.updateProfile
@@ -108,5 +109,8 @@ router.post('/privacy/2fa/verify', AuthMiddleware, UserController.verifyTwoFACod
 router.post('/verify-2fa', AuthMiddleware, UserController.verifyTwoFAToken);
 router.get('/sessions', AuthMiddleware, UserController.getActiveSessions);
 router.delete('/sessions', AuthMiddleware, UserController.deleteAllSessions);
+
+router.delete('/delete-image', AuthMiddleware, UserController.deleteImage);
+
 
 module.exports = router;

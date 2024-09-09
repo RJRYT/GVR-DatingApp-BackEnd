@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const ProfilePicSchema = mongoose.Schema({
-  url: { type: String, reqired: true },
-  key: { type: String, reqired: true },
+  url: { type: String, required: true },
+  key: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
 });
 
