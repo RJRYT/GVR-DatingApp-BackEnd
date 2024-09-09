@@ -767,7 +767,7 @@ exports.generateTwoFASecret = CatchAsync(async (req, res) => {
   }
 
   // Generate a secret key for the user
-  const secret = speakeasy.generateSecret({ name: `MyApp (${user.email})` });
+  const secret = speakeasy.generateSecret({ name: `Dating App: ${user.email}` });
 
   // Generate the QR code
   const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
