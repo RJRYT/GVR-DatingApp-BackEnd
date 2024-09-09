@@ -26,7 +26,7 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
       $gte: preferences.AgeRange.min,
       $lte: preferences.AgeRange.max,
     },
-    ["location.name"]: { $in: preferences.Location.map(loc => loc.value) },
+    ["location.shortName"]: { $in: preferences.Location.map(loc => loc.value) },
     personalInfoSubmitted: true,
     professionalInfoSubmitted: true,
     purposeSubmitted: true,
@@ -39,16 +39,16 @@ exports.matchAlgorithm = CatchAsync(async (req, res) => {
     matchingQuery["hobbies.value"] = { $in: preferences.Hobbies.map(hby => hby.value) };
   }
   if (preferences.Education.length) {
-    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu => edu.value) };
+    matchingQuery["qualification.value"] = { $in: preferences.Education.map(edu => edu.value) }; 
   }
   if (preferences.Gender) {
-    matchingQuery.gender = preferences.Gender;
+    if(preferences.Gender.value !== "both") matchingQuery.gender = preferences.Gender.value;
   }
 
   // Find users that match the preferences
   let matches = await User.find(
     matchingQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel isOnline"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -208,7 +208,7 @@ exports.fetchFilteredMatches = CatchAsync(async (req, res) => {
 
   let matches = await User.find(
     fetchQuery,
-    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel"
+    "id username age gender location hobbies interests smokingHabits drinkingHabits qualification profilePic images shortReel isOnline"
   )
     .limit(limit * 1)
     .skip((page - 1) * limit)

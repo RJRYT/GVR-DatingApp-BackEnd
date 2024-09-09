@@ -21,6 +21,9 @@ router.get("/google/callback", AuthController.PassportVerify, AuthController.Goo
 //Phone Number Verify
 router.post("/number/sendotp", AuthController.SendCode);
 
+// OTP Verify
+router.post("/number/verifyotp", AuthController.verifyCode)
+
 
 
 module.exports = router;

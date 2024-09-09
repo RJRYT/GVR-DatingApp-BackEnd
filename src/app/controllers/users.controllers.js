@@ -349,64 +349,73 @@ exports.changePassword = CatchAsync(async (req, res) => {
 });
 
 exports.updateProfile = CatchAsync(async (req, res) => {
-  console.log(req.body);
-  console.log("Files:", req.files);
+  const { firstName, lastName, username, about } = req.body;
+
+  // Find user and proceed with profile update if OTP is verified
   const user = await User.findById(req.user.id);
-  //Delete existing profile pic if any
-  if (user.profilePic && user.profilePic.key) {
-    const params = {
-      Bucket: process.env.S3_BUCKET,
-      Key: user.profilePic.key,
-    };
-    await s3Config.send(new DeleteObjectCommand(params));
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
   }
-  //Delete existing images if any
-  if (user.images && user.images.length > 0) {
-    for (const pic of user.images) {
-      if (pic.key) {
-        const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
-        await s3Config.send(new DeleteObjectCommand(params));
-      }
+
+  // Handle file deletions and uploads
+  const deleteFile = async (key) => {
+    if (key) {
+      const params = { Bucket: process.env.S3_BUCKET, Key: key };
+      await s3Config.send(new DeleteObjectCommand(params));
+    }
+  };
+
+  try {
+    await Promise.all([
+      deleteFile(user.profilePic?.key),
+      ...user.images.map((pic) => deleteFile(pic.key)),
+      deleteFile(user.shortReel?.key),
+    ]);
+  } catch (fileDeleteError) {
+    console.error("Error deleting files:", fileDeleteError);
+    return res.status(500).json({ success: false, message: "Error deleting old files" });
+  }
+
+  if (req.files) {
+    if (req.files.shortreels) {
+      user.shortReel = {
+        url: req.files.shortreels[0]?.location,
+        key: req.files.shortreels[0]?.key,
+      };
+    }
+
+    if (req.files.images) {
+      user.images = req.files.images.map((file) => ({
+        url: file.location,
+        key: file.key,
+      }));
+    }
+
+    if (req.files.profilePic) {
+      user.profilePic = {
+        url: req.files.profilePic[0]?.location,
+        key: req.files.profilePic[0]?.key,
+      };
     }
   }
-  //Delete existing shortreel if any
-  if (user.shortReel && user.shortReel.key) {
-    const params = {
-      Bucket: process.env.S3_BUCKET,
-      Key: user.shortReel.key,
-    };
-    await s3Config.send(new DeleteObjectCommand(params));
-  }
 
-  // Saving uploaded files to user
-  if (req.files?.shortreels) {
-    console.log("Short reels:", req.files.shortreels); // Debug l
-    user.shortReel = {
-      url: req.files.shortreels[0]?.location,
-      key: req.files.shortreels[0]?.key,
-    };
-  }
+  // Update other user details
+  user.firstName = firstName;
+  user.lastName = lastName;
+  user.username = username;
+  user.about = about;
 
-  if (req.files?.images) {
-    console.log("Images:", req.files.images); // Debug line
-    user.images = req.files.images.map((file) => ({
-      url: file.location,
-      key: file.key,
-    }));
+  // Save the updated user document
+  try {
+    await user.save();
+    console.log("User saved successfully. Updated user:", user);
+    return res.status(200).json({ success: true, message: "Profile updated successfully", user });
+  } catch (error) {
+    console.error("Error saving user:", error);
+    return res.status(500).json({ success: false, message: "Failed to update profile", error: error.message });
   }
-
-  if (req.files?.profilePic) {
-    user.profilePic = {
-      url: req.files.profilepic?.location,
-      key: req.files.profilepic?.key,
-    };
-  }
-
-  user.username = req.body.username;
-  user.about = req.body.bio;
-  await user.save();
-  return res.json({ status: 200, success: true, message: "Upload done", user });
 });
+
 
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
   const { notificationId } = req.body;
@@ -426,6 +435,7 @@ exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
     message: "Notification marked as read",
   });
 });
+
 
 exports.deleteNotification = CatchAsync(async (req, res) => {
   const { notificationId } = req.body;
