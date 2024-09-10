@@ -11,7 +11,6 @@ module.exports = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    console.log("[AuthMiddleware]: ",err);
     res.status(401).json({ status: 401, success: false, message: "Token is not valid" });
   }
 };

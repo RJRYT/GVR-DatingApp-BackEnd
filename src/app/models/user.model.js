@@ -27,6 +27,14 @@ const notificationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
+
+const SessionSchema = new mongoose.Schema({
+  token: { type: String, required: true },
+  device: { type: String, default: 'Unknown Device' },
+  ipAddress: { type: String, default: 'Unknown IP' },
+  lastActive: { type: Date, default: Date.now },
+});
+
 const UserSchema = mongoose.Schema(
   {
     firstName: { type: String },
@@ -37,6 +45,7 @@ const UserSchema = mongoose.Schema(
     password: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     phoneNumber: { type: String, unique: true, sparse: true },
+    about: { type: String, default: "" },
     date: { type: Date, default: Date.now },
     numberVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
@@ -46,7 +55,16 @@ const UserSchema = mongoose.Schema(
     age: { type: Number },
     dateOfBirth: { type: Date },
     gender: { type: String },
-    location: { type: String },
+    location: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      shortName: { type: String },
+      name: { type: String },
+    },
+    currentLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+    },
     hobbies: [{ label: String, value: String }],
     interests: [{ label: String, value: String }],
     smokingHabits: { type: String },
@@ -64,9 +82,18 @@ const UserSchema = mongoose.Schema(
     purpose: { type: String },
     notifications: [notificationSchema],
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    shortlists: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    rejected: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
+    lastLogin: { type: Date, default: Date.now },
+    twoFA : { type: Boolean, default: false },
+    twoFASecret :{type : String},
+    lastDeviceName: { type: String },
+    lastIpAddress: { type: String },
     fake: { type: Boolean },
+    sessions: [SessionSchema],
   },
   { timestamps: true }
 );

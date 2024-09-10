@@ -1,10 +1,13 @@
 const { User, FriendRequests, PrivateChat } = require("../models");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { generateAccessToken } = require("../services").Token;
 const CatchAsync = require("../util/catchAsync");
 const bcrypt = require("bcryptjs");
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from users" });
@@ -47,7 +50,14 @@ exports.RefreshToken = CatchAsync(async (req, res) => {
 });
 
 exports.CheckUser = CatchAsync(async (req, res) => {
+  const {lat, lon} = req.query;
   const user = await User.findById(req.user.id).select("-password");
+  if(lat && lon){
+    user.currentLocation = {};
+    user.currentLocation.latitude = lat;
+    user.currentLocation.longitude = lon;
+    await user.save();
+  }
   res.json({ status: 200, success: true, message: "User found", user });
 });
 
@@ -95,16 +105,16 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   }
   //Saving uploaded files to user
   user.shortReel = {
-    url: req.files.shortreels.location,
-    key: req.files.shortreels.key,
+    url: req.files.shortreels[0].location,
+    key: req.files.shortreels[0].key,
   };
   user.images = req.files.images.map((file) => ({
     url: file.location,
     key: file.key,
   }));
   user.profilePic = {
-    url: req.files.profilepic.location,
-    key: req.files.profilepic.key,
+    url: req.files.profilepic[0].location,
+    key: req.files.profilepic[0].key,
   };
 
   //saving other values
@@ -112,7 +122,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.dateOfBirth = req.body.dateOfBirth;
   user.gender = req.body.gender;
   user.hobbies = JSON.parse(req.body.hobbies);
-  user.location =  req.body.location;
+  user.location =  JSON.parse(req.body.location);
   user.interests = JSON.parse(req.body.interests);
   user.smokingHabits = req.body.smokingHabits;
   user.drinkingHabits = req.body.drinkingHabits;
@@ -181,8 +191,13 @@ exports.updateUserPurposeDetails = CatchAsync(async (req, res) => {
 });
 
 exports.fetchUserDetails = CatchAsync(async (req, res) => {
-  console.log(req.params);
   const { userId } = req.params;
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "User id is not valid" });
+  }
+
+  const chat = await PrivateChat.findOne({ participants: [userId, req.user.id] })
 
   const user = await User.findById(
     userId,
@@ -192,8 +207,93 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
   }
+  if (!user.viewers) {
+    user.viewers = [];
+  }
+  if (!user.viewers.includes(req.user.id)) {
+    user.viewers.addToSet(req.user.id);
+    await user.save();
+  }
+
+  if(chat){
+    user.chatId = chat._id;
+  }else{
+    user.chatId = null;
+  }
 
   res.json({ status: 200, success: true, user, message: "User found" });
+});
+
+exports.rejectUserProfile = CatchAsync(async (req, res) => {
+  const { rejectedUserId } = req.body;
+  const userId = req.user.id;
+
+  if(!rejectedUserId) return res.json({ status: 403, success: false, message: "\"rejectedUserId\" is not found in request body" });
+  if (!mongoose.isValidObjectId(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "rejected User id is not valid" });
+  }
+
+  const user = await User.findById(userId);
+  if (user.rejected.includes(rejectedUserId)) {
+    return res.json({ status: 403, success: false, message: "Profile already rejected" });
+  }
+
+  await User.findByIdAndUpdate(userId, { $push: { rejected: rejectedUserId } });
+  
+  res.status(200).json({ status: 200, success: true, message: "Profile rejected successfully" });
+});
+
+
+
+exports.privacyDetails = CatchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;  // Use `req.user.id` for authenticated user ID
+    const user = await User.findById(userId).select('lastLogin twoFA lastDeviceName lastIpAddress');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Format the lastLogin date
+    const now = new Date();
+    const lastLoginDate = new Date(user.lastLogin);
+    const isToday = now.toDateString() === lastLoginDate.toDateString();
+    const formattedTime = lastLoginDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const lastLoginFormatted = isToday ? `Today at ${formattedTime}` : lastLoginDate.toLocaleString();
+
+    res.json({
+      lastSignInTime: lastLoginFormatted,
+      twoFactorEnabled: user.twoFA,
+      lastDeviceName: user.lastDeviceName,
+      lastIpAddress: user.lastIpAddress,
+    });
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+exports.twoFAStatusUpdate= (async (req, res) => {
+  try {
+    const userId = req.user.id;  // Assuming `req.user.id` holds the authenticated user's ID
+    const { twoFactorEnabled } = req.body;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.twoFA = twoFactorEnabled;
+    await user.save();
+
+    res.json({ message: '2FA status updated successfully', twoFactorEnabled: user.twoFA });
+  } catch (error) {
+    console.error('Error updating 2FA status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 exports.checkPassword = CatchAsync(async (req, res) => {
@@ -251,87 +351,157 @@ exports.changePassword = CatchAsync(async (req, res) => {
 });
 
 exports.updateProfile = CatchAsync(async (req, res) => {
-  console.log(req.body);
-  console.log("Files:", req.files);
+  const { firstName, lastName, username, about } = req.body;
+
+  // Find user and proceed with profile update if OTP is verified
   const user = await User.findById(req.user.id);
-  //Delete existing profile pic if any
-  if (user.profilePic && user.profilePic.key) {
-    const params = {
-      Bucket: process.env.S3_BUCKET,
-      Key: user.profilePic.key,
-    };
-    await s3Config.send(new DeleteObjectCommand(params));
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
   }
-  //Delete existing images if any
-  if (user.images && user.images.length > 0) {
-    for (const pic of user.images) {
-      if (pic.key) {
-        const params = { Bucket: process.env.S3_BUCKET, Key: pic.key };
-        await s3Config.send(new DeleteObjectCommand(params));
-      }
+
+  // Handle file deletions and uploads
+  const deleteFile = async (key) => {
+    if (key) {
+      const params = { Bucket: process.env.S3_BUCKET, Key: key };
+      await s3Config.send(new DeleteObjectCommand(params));
+    }
+  };
+
+  try {
+    await Promise.all([
+      deleteFile(user.profilePic?.key),
+      ...user.images.map((pic) => deleteFile(pic.key)),
+      deleteFile(user.shortReel?.key),
+    ]);
+  } catch (fileDeleteError) {
+    console.error("Error deleting files:", fileDeleteError);
+    return res.status(500).json({ success: false, message: "Error deleting old files" });
+  }
+
+  if (req.files) {
+    if (req.files.shortreels) {
+      user.shortReel = {
+        url: req.files.shortreels[0]?.location,
+        key: req.files.shortreels[0]?.key,
+      };
+    }
+
+    if (req.files.images) {
+      user.images = req.files.images.map((file) => ({
+        url: file.location,
+        key: file.key,
+      }));
+    }
+
+    if (req.files.profilePic) {
+      user.profilePic = {
+        url: req.files.profilePic[0]?.location,
+        key: req.files.profilePic[0]?.key,
+      };
     }
   }
-  //Delete existing shortreel if any
-  if (user.shortReel && user.shortReel.key) {
-    const params = {
-      Bucket: process.env.S3_BUCKET,
-      Key: user.shortReel.key,
-    };
-    await s3Config.send(new DeleteObjectCommand(params));
-  }
 
-  // Saving uploaded files to user
-  if (req.files?.shortreels) {
-    console.log("Short reels:", req.files.shortreels); // Debug l
-    user.shortReel = {
-      url: req.files.shortreels[0]?.location,
-      key: req.files.shortreels[0]?.key,
-    };
-  }
+  // Update other user details
+  user.firstName = firstName;
+  user.lastName = lastName;
+  user.username = username;
+  user.about = about;
 
-  if (req.files?.images) {
-    console.log("Images:", req.files.images); // Debug line
-    user.images = req.files.images.map((file) => ({
-      url: file.location,
-      key: file.key,
-    }));
+  // Save the updated user document
+  try {
+    await user.save();
+    console.log("User saved successfully. Updated user:", user);
+    return res.status(200).json({ success: true, message: "Profile updated successfully", user });
+  } catch (error) {
+    console.error("Error saving user:", error);
+    return res.status(500).json({ success: false, message: "Failed to update profile", error: error.message });
   }
-
-  if(req.files?.profilePic){
-    user.profilePic = {
-      url: req.files.profilepic?.location,
-      key: req.files.profilepic?.key,
-    };
-  
-  }
- 
-  user.username = req.body.username;
-  user.bio = req.body.bio;
-  await user.save();
-  return res.json({ status: 200, success: true, message: "Upload done", user });
 });
 
+exports.displayStories = CatchAsync(async (req,res) => {
+ 
+  const user=await User.findById(req.user.id)
+  .populate({
+    path:'friends',
+    select:'username shortReel'
+  })
+  .exec()
+  console.log(user)
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const userStory = {
+    username: user.username,
+    shortReel: user.shortReel ? user.shortReel.url : null,  // Assuming you want the first short reel
+  };
+
+  const friendsStories = user.friends.map(friend => ({
+    username: friend.username,
+    shortReel: friend.shortReel ? friend.shortReel.url : null,
+  }));
+
+  const stories = [userStory, ...friendsStories];
+  console.log(userStory,"............")
+  res.status(200).json({ stories });
+})
+
+
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
   await User.updateOne(
-    { _id: userId, "notifications._id": notificationId },
+    { _id: req.user.id, "notifications._id": notificationId },
     { $set: { "notifications.$.read": true } }
   );
+
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationRead", { notificationId });
 
   res.json({
     success: true,
     status: 200,
-    message: "notification marked as read",
+    message: "Notification marked as read",
   });
 });
 
+
 exports.deleteNotification = CatchAsync(async (req, res) => {
-  const { userId, notificationId } = req.body;
+  const { notificationId } = req.body;
 
-  await User.deleteOne({ _id: userId, "notifications._id": notificationId });
+  await User.updateOne(
+    { _id: req.user.id },
+    { $pull: { notifications: { _id: notificationId } } }
+  );
 
-  res.json({ success: true, status: 200, message: "notification deleted" });
+  req.app.locals.io
+    .to(req.user.id)
+    .emit("notificationDeleted", { notificationId });
+
+  res.json({ success: true, status: 200, message: "Notification deleted" });
+});
+
+exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
+  const pendingFriends = await FriendRequests.find({
+    recipient: req.user.id,
+    status: "pending",
+  }).populate("sender", "username profilePic");
+
+  if (!pendingFriends.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `Friends pending friend list`,
+    pending: pendingFriends,
+  });
 });
 
 exports.fetchFriendRequests = CatchAsync(async (req, res) => {
@@ -365,6 +535,11 @@ exports.fetchFriendRequests = CatchAsync(async (req, res) => {
 
 exports.addFriendRequest = CatchAsync(async (req, res) => {
   const { recipientId } = req.body;
+
+  if (!mongoose.isValidObjectId(recipientId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
   const requestCheck = await FriendRequests.findOne({
     sender: req.user.id,
     recipient: recipientId,
@@ -434,14 +609,16 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
   }
 
   const recipient = await User.findById(recipientId);
+  const user = await User.findById(req.user.id);
 
   // Add a new notification to the recipient's notifications array
   const notification = {
     type: "FriendRequest",
-    message: `You have a new friend request from ${req.user.username}`,
+    message: `You have a new friend request from ${user.username}`,
     from: req.user.id,
   };
   recipient.notifications.push(notification);
+  req.app.locals.io.to(recipientId).emit("newNotification", notification);
   await recipient.save();
 
   const request = new FriendRequests({
@@ -454,6 +631,9 @@ exports.addFriendRequest = CatchAsync(async (req, res) => {
 
 exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -499,15 +679,16 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
   const sender = await User.findById(request.sender);
   const recipient = await User.findById(request.recipient);
 
-  sender.friends.push(request.recipient);
-  recipient.friends.push(request.sender);
+  sender.friends.addToSet(request.recipient);
+  recipient.friends.addToSet(request.sender);
 
   const notification = {
     type: "requestAccepted",
-    message: `${req.user.username} accepted your friend request`,
+    message: `${sender.username} accepted your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   await recipient.save();
 
@@ -516,6 +697,9 @@ exports.acceptFriendRequest = CatchAsync(async (req, res) => {
 
 exports.declineFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -544,19 +728,24 @@ exports.declineFriendRequest = CatchAsync(async (req, res) => {
   await request.save();
 
   const sender = await User.findById(request.sender);
+  const requester = await User.findById(request.recipient);
 
   const notification = {
     type: "requestDeclined",
-    message: `${req.user.username} declined your friend request`,
+    message: `${requester.username} declined your friend request`,
     from: request.recipient,
   };
   sender.notifications.push(notification);
+  req.app.locals.io.to(request.sender).emit("newNotification", notification);
   await sender.save();
   return res.json({ status: 201, success: true, message: "Request declined" });
 });
 
 exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   const { requestId } = req.params;
+  if (!mongoose.isValidObjectId(requestId)) {
+    return res.json({ status: 403, success: false, message: "request id is not valid" });
+  }
   const request = await FriendRequests.findById(requestId);
   if (!request)
     return res.json({
@@ -585,3 +774,270 @@ exports.cancelFriendRequest = CatchAsync(async (req, res) => {
   await request.save();
   return res.json({ status: 201, success: true, message: "Request cancelled" });
 });
+
+
+
+exports.logUser = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).select("-password");
+
+  if (!user) {
+    return res.status(404).json({ status: 404, success: false, message: "User not found" });
+  }
+
+  // Update lastLogin, deviceName, and ipAddress fields
+  user.lastLogin = new Date();
+  user.deviceName = req.headers['user-agent'] || 'Unknown device'; // Get device name from User-Agent
+  user.ipAddress = req.ip; // Get IP address
+
+  await user.save();
+
+  res.json({ status: 200, success: true, message: "User found", user });
+});
+
+
+exports.generateTwoFASecret = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Generate a secret key for the user
+  const secret = speakeasy.generateSecret({ name: `MyApp (${user.email})` });
+
+  // Generate the QR code
+  const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+  // Save the secret to the user record (ensure it's stored securely)
+  user.twoFASecret = secret.base32;
+  await user.save();
+
+  // Return the QR code and secret to the frontend
+  res.json({
+    qrCodeUrl,
+    secret: secret.base32,
+  });
+});
+
+exports.verifyTwoFACode = CatchAsync(async (req, res) => {
+  const { token } = req.body;  // The 6-digit code from the user
+  console.log(token)
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const isVerified = speakeasy.totp.verify({
+    secret: user.twoFASecret,
+    encoding: 'base32',
+    token,
+  });
+
+  if (isVerified) {
+    user.twoFA = true;  // Enable 2FA
+    await user.save();
+    return res.json({ success: true, message: '2FA enabled successfully' });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+});
+
+
+
+
+exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
+  const { token } = req.body;  // The 6-digit code from the user
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const isVerified = speakeasy.totp.verify({
+    secret: user.twoFASecret,
+    encoding: 'base32',
+    token,
+  });
+
+  if (isVerified) {
+
+    const userAgent = req.headers['user-agent'];
+    const device = userAgent || 'Unknown Device';
+
+    // Extract IP address
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+    // Update last login details
+    user.lastLogin = new Date();
+    user.lastDeviceName = device;
+    user.lastIpAddress = ip;
+
+
+    const session = {
+      token,
+      device,
+      ipAddress: ip,
+      lastActive: new Date(),
+    };
+
+    user.sessions.push(session);
+    await user.save();
+
+    return res.json({ success: true, message: '2FA enabled successfully' });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+});
+
+
+exports.getActiveSessions = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('sessions');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user.sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.deleteAllSessions = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.sessions = [];
+    await user.save();
+
+    res.json({ message: 'All sessions cleared' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.updateShortListedUsers = CatchAsync(async (req, res) => {
+  const { userId } = req.body;
+  if (!userId)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Please provide user id to add/remove",
+    });
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.json({ status: 403, success: false, message: "user id is not valid" });
+  }
+
+  const shortListUser = await User.findById(userId);
+  if (!shortListUser)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User not found",
+    });
+
+  const user = await User.findById(req.user.id);
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.includes(userId)) {
+    user.shortlists.addToSet(userId);
+    await user.save();
+  } else {
+    user.shortlists.pull(userId);
+    await user.save();
+  }
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `user has ${user.shortlists.includes(userId) ? "added to" : "removed from"
+      } your shortlist`,
+  });
+});
+
+exports.listMyShortList = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "shortlists",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.shortlists.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your shortlisted users`,
+    shortlist: user.shortlists,
+  });
+});
+
+exports.ListShortListedBy = CatchAsync(async (req, res) => {
+  const users = await User.find(
+    { shortlists: { $in: [req.user.id] } },
+    "username profilePic"
+  );
+  if (!users.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: `List of users who shortlisted you`,
+    shortlist: users,
+  });
+});
+
+exports.listMyProfileViewers = CatchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).populate(
+    "viewers",
+    "username profilePic"
+  );
+  if (!user)
+    return res.json({
+      success: false,
+      status: 404,
+      message: "User error. please re-login",
+    });
+
+  if (!user.viewers.length)
+    return res.json({
+      success: false,
+      status: 300,
+      message: "Nothing to show",
+    });
+
+  return res.json({
+    status: 201,
+    success: true,
+    message: `your profile viewed users`,
+    viewers: user.viewers,
+  });
+});
+

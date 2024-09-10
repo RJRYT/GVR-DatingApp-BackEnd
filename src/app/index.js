@@ -52,7 +52,7 @@ app.use(GlobalErrorMiddleware);
 // Schedule the cleanup to run daily at midnight
 cron.schedule("0 0 * * *", () => {
   console.log("[Corn Job]:Corn job triggered...");
-  CleanupFiles();
+  //CleanupFiles();
 });
 
 // Server error logger
@@ -66,12 +66,19 @@ process.on("uncaughtException", (err, origin) => {
 
 // Socket.io config
 const server = require('http').createServer(app);
-const io = require('socket.io')(server, {
-    cors: corsConfig
+const io = require("socket.io")(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
 });
 
 SocketIo(io);
 
-app.set("socketio", io);
+app.locals.io = io;
+
+// to pass correct IP Address
+app.set('trust proxy', true);
 
 module.exports = server;

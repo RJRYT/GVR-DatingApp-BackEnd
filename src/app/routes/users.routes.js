@@ -33,12 +33,19 @@ router.post(
   AuthMiddleware,
   UserController.updateUserPurposeDetails
 );
+router.get(
+  "/stories",
+  AuthMiddleware,
+  UserController.displayStories
+);
 
 router.get("/profile/:userId", AuthMiddleware, UserController.fetchUserDetails);
 
 router.get("/password/check", AuthMiddleware, UserController.checkPassword);
 
 router.put("/password/change", AuthMiddleware, UserController.changePassword);
+
+router.put("/profile/reject", AuthMiddleware, UserController.rejectUserProfile)
 
 router.post(
   "/notification/markread",
@@ -52,6 +59,11 @@ router.post(
 );
 
 router.get("/friends", AuthMiddleware, UserController.fetchFriendRequests);
+router.get(
+  "/friends/pending",
+  AuthMiddleware,
+  UserController.fetchMyPendingRequests
+);
 router.post(
   "/friends/request",
   AuthMiddleware,
@@ -73,14 +85,33 @@ router.put(
   UserController.cancelFriendRequest
 );
 router.put(
-  '/update/profile',
+  "/update/profile",
   AuthMiddleware,
   UploadMiddleware.fields([
-    { name: 'images', maxCount: 5 },
-    { name: 'profilePic', maxCount:1},
-    { name: 'shortreels', maxCount: 1 }
+    { name: "images", maxCount: 5 },
+    { name: "profilepic", maxCount: 1 },
+    { name: "shortreels", maxCount: 1 },
   ]),
   UserController.updateProfile
 );
+
+router.get("/shortlist", AuthMiddleware, UserController.listMyShortList);
+router.get("/shortlist/by", AuthMiddleware, UserController.ListShortListedBy);
+router.post(
+  "/shortlist",
+  AuthMiddleware,
+  UserController.updateShortListedUsers
+);
+
+router.get("/views", AuthMiddleware, UserController.listMyProfileViewers);
+
+
+router.get('/privacy', AuthMiddleware, UserController.privacyDetails); 
+router.post('/privacy/2fa', AuthMiddleware, UserController.twoFAStatusUpdate);
+router.get('/privacy/2fa/generate', AuthMiddleware, UserController.generateTwoFASecret);
+router.post('/privacy/2fa/verify', AuthMiddleware, UserController.verifyTwoFACode);
+router.post('/verify-2fa', AuthMiddleware, UserController.verifyTwoFAToken);
+router.get('/sessions', AuthMiddleware, UserController.getActiveSessions);
+router.delete('/sessions', AuthMiddleware, UserController.deleteAllSessions);
 
 module.exports = router;
