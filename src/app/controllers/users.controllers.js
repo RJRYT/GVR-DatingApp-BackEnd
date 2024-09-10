@@ -216,12 +216,12 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 403, success: false, message: "User id is not valid" });
   }
 
-  const chat = await PrivateChat.findOne({ participants: [userId, req.user.id] })
+  const chat = await PrivateChat.findOne({ participants: {$in:[userId, req.user.id]} })
 
   const user = await User.findById(
     userId,
     "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
-  ).lean();
+  );
 
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
@@ -234,13 +234,7 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     await user.save();
   }
 
-  if (chat) {
-    user.chatId = chat._id;
-  } else {
-    user.chatId = null;
-  }
-
-  res.json({ status: 200, success: true, user, message: "User found" });
+  res.json({ status: 200, success: true, user, chat:chat?._id, message: "User found" });
 });
 
 exports.rejectUserProfile = CatchAsync(async (req, res) => {
