@@ -221,7 +221,7 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
   const user = await User.findById(
     userId,
     "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
-  );
+  ).lean();
 
   if (!user) {
     return res.json({ status: 404, success: false, message: "User not found" });
@@ -366,7 +366,7 @@ exports.changePassword = CatchAsync(async (req, res) => {
 });
 
 exports.updateProfile = CatchAsync(async (req, res) => {
-  const { firstName, lastName, username, about , profilePic } = req.body;
+  const { firstName, lastName, username, about } = req.body;
 
   // Find user and proceed with profile update if OTP is verified
   const user = await User.findById(req.user.id);
@@ -414,7 +414,7 @@ exports.updateProfile = CatchAsync(async (req, res) => {
         url: req.files.profilePic[0]?.location,
         key: req.files.profilePic[0]?.key,
       };
-      
+
     }
     if (req.files.images) {
       console.log('Appending new images to the existing ones');
@@ -428,7 +428,6 @@ exports.updateProfile = CatchAsync(async (req, res) => {
       ];
 
     }
-
 
     if (req.files.shortreels) {
       user.shortReel = {
@@ -460,7 +459,8 @@ exports.updateProfile = CatchAsync(async (req, res) => {
       updatedProfilePic: user.profilePic?.url, // Send the updated profilePic URL
       images: user.images,
       user,
-    });  } catch (error) {
+    });
+  } catch (error) {
     console.error("Error saving user:", error);
     return res.status(500).json({ success: false, message: "Failed to update profile", error: error.message });
   }

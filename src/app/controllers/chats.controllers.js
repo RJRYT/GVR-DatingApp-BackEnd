@@ -124,10 +124,10 @@ exports.fetchChats = CatchAsync(async (req, res) => {
   const userId = req.user.id;
 
   const chats = await PrivateChat.find({ participants: userId })
-    .populate('participants', 'username profilePic');
+    .populate('participants', 'id username profilePic');
 
   const formattedChats = await Promise.all(chats.map(async chat => {
-    const otherParticipant = chat.participants.find(p => p._id.toString() !== userId.toString());
+    const otherParticipant = chat.participants.find(p => p.id.toString() !== userId.toString());
 
     const lastMessage = await PrivateMessages.findOne({ chatRoom: chat._id })
       .sort({ timestamp: -1, _id: -1 })
@@ -136,9 +136,9 @@ exports.fetchChats = CatchAsync(async (req, res) => {
     return {
       chatId: chat._id,
       user: {
-        _id: otherParticipant._id,
-        username: otherParticipant.username,
-        profilePic: otherParticipant.profilePic,
+        _id: otherParticipant?.id || "",
+        username: otherParticipant?.username || "",
+        profilePic: otherParticipant?.profilePic || {url:""},
       },
       lastMessage: {
         text: lastMessage ? lastMessage.content : "No messages yet",

@@ -8,14 +8,14 @@ const ProfilePicSchema = mongoose.Schema({
 });
 
 const ImagesSchema = mongoose.Schema({
-  url: { type: String, reqired: true },
-  key: { type: String, reqired: true },
+  url: { type: String, required: true },
+  key: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
 });
 
 const ShortReelSchema = mongoose.Schema({
-  url: { type: String, reqired: true },
-  key: { type: String, reqired: true },
+  url: { type: String, required: true },
+  key: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
 });
 
@@ -48,14 +48,14 @@ const UserSchema = mongoose.Schema(
     dateOfBirth: { type: Date },
     gender: { type: String },
     location: {
-      latitude: { type: Number },
-      longitude: { type: Number },
+      latitude: { type: Number, default: 0 },
+      longitude: { type: Number, default: 0 },
       shortName: { type: String },
       name: { type: String },
     },
     currentLocation: {
-      latitude: { type: Number },
-      longitude: { type: Number },
+      latitude: { type: Number, default: 0 },
+      longitude: { type: Number, default: 0 },
     },
     hobbies: [{ label: String, value: String }],
     interests: [{ label: String, value: String }],
