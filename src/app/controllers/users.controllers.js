@@ -423,7 +423,7 @@ exports.displayStories = CatchAsync(async (req,res) => {
   const user=await User.findById(req.user.id)
   .populate({
     path:'friends',
-    select:'username shortReel'
+    select:'username shortReel profilePic'
   })
   .exec()
   console.log(user)
@@ -434,11 +434,13 @@ exports.displayStories = CatchAsync(async (req,res) => {
 
   const userStory = {
     username: user.username,
+    profilePic:user.profilePic ? user.profilePic.url:null,
     shortReel: user.shortReel ? user.shortReel.url : null,  // Assuming you want the first short reel
   };
 
   const friendsStories = user.friends.map(friend => ({
     username: friend.username,
+    profilePic:friend.profilePic ? friend.profilePic.url:null,
     shortReel: friend.shortReel ? friend.shortReel.url : null,
   }));
 
