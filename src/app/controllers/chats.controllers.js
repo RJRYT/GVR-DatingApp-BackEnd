@@ -1,3 +1,4 @@
+const { formatWithOptions } = require("util");
 const { User, ChatRequests, PrivateChat, GroupChat, PrivateMessages } = require("../models");
 const CatchAsync = require("../util/catchAsync");
 const mongoose = require("mongoose");
@@ -124,7 +125,7 @@ exports.fetchChats = CatchAsync(async (req, res) => {
   const userId = req.user.id;
 
   const chats = await PrivateChat.find({ participants: userId })
-    .populate('participants', 'id username profilePic');
+    .populate('participants', 'id username profilePic').sort({updatedAt: -1});
 
   const formattedChats = await Promise.all(chats.map(async chat => {
     const otherParticipant = chat.participants.find(p => p.id.toString() !== userId.toString());
