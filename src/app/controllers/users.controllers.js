@@ -366,7 +366,8 @@ exports.changePassword = CatchAsync(async (req, res) => {
 });
 
 exports.updateProfile = CatchAsync(async (req, res) => {
-  const { firstName, lastName, username, about } = req.body;
+  const { firstName, lastName, username, about, replacedImages } = req.body;
+  const replacedImgArray = replacedImages.trim().split(",");
 
   // Find user and proceed with profile update if OTP is verified
   const user = await User.findById(req.user.id);
@@ -387,13 +388,7 @@ exports.updateProfile = CatchAsync(async (req, res) => {
     if (req.files) {
       if (req.files.profilePic) {
         // Delete old profilePic only if a new one is uploaded
-        console.log('Deleting old profilePic with key:', user.profilePic?.key);
         await deleteFile(user.profilePic?.key);
-      }
-
-      if (req.files.images) {
-        // Delete old images only if new images are uploaded
-        await Promise.all(user.images.map((pic) => deleteFile(pic.key)));
       }
 
       if (req.files.shortreels) {
@@ -401,6 +396,19 @@ exports.updateProfile = CatchAsync(async (req, res) => {
         await deleteFile(user.shortReel?.key);
       }
     }
+
+    if (req.files.images && replacedImgArray.length) {
+      await Promise.all(user.images.map((pic) => {
+        if (replacedImgArray.includes(pic.key)) {
+          user.images = user.images.filter(img => img.url !== pic.url);
+          return deleteFile(pic.key)
+        }
+      }));
+    }
+
+    //remove images with key null
+    user.images = user.images.filter(img => img.key);
+
   } catch (fileDeleteError) {
     console.error("Error deleting files:", fileDeleteError);
     return res.status(500).json({ success: false, message: "Error deleting old files" });
@@ -408,16 +416,13 @@ exports.updateProfile = CatchAsync(async (req, res) => {
 
   // Update with new files if they exist in req.files
   if (req.files) {
-    if (req.files.profilePic) {
-      console.log('Received new profilePic file details:', req.files.profilePic);
+    if (req.files.profilepic) {
       user.profilePic = {
-        url: req.files.profilePic[0]?.location,
-        key: req.files.profilePic[0]?.key,
+        url: req.files.profilepic[0]?.location,
+        key: req.files.profilepic[0]?.key,
       };
-
     }
     if (req.files.images) {
-      console.log('Appending new images to the existing ones');
       // Append new images to the existing ones instead of replacing them
       user.images = [
         ...user.images,  // Keep existing images
@@ -426,7 +431,6 @@ exports.updateProfile = CatchAsync(async (req, res) => {
           key: file.key,
         })),
       ];
-
     }
 
     if (req.files.shortreels) {
@@ -437,18 +441,13 @@ exports.updateProfile = CatchAsync(async (req, res) => {
     }
   }
 
-  // // If there were no changes to the images field, retain the existing images
-  // if (!imageChanges) {
-  //   console.log('No changes in the images field. Keeping the existing images');
-  // } else {
-  //   console.log('Images field has changed. Appending new images');
-  // }
-
   // Update other user details (basic information)
   user.firstName = firstName;
   user.lastName = lastName;
-  user.username = username;
   user.about = about;
+  if (!user.username && username) {
+    user.username = username;
+  }
 
   // Save the updated user document
   try {
@@ -456,9 +455,9 @@ exports.updateProfile = CatchAsync(async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      updatedProfilePic: user.profilePic?.url, // Send the updated profilePic URL
+      profilePic: user.profilePic, // Send the updated profilePic URL
       images: user.images,
-      user,
+      reel: user.shortReel,
     });
   } catch (error) {
     console.error("Error saving user:", error);
@@ -1050,7 +1049,7 @@ exports.listMyProfileViewers = CatchAsync(async (req, res) => {
 
 
 exports.deleteImage = CatchAsync(async (req, res) => {
-  const { imageUrl } = req.body; // The URL of the image to delete
+  const { imageUrl } = req.body;
 
   // Find user
   const user = await User.findById(req.user.id);
@@ -1066,9 +1065,11 @@ exports.deleteImage = CatchAsync(async (req, res) => {
 
   // Delete image from S3
   try {
-    const params = { Bucket: process.env.S3_BUCKET, Key: image.key };
-    await s3Config.send(new DeleteObjectCommand(params));
-    console.log(`Successfully deleted image with key: ${image.key}`);
+    if (image.key) {
+      const params = { Bucket: process.env.S3_BUCKET, Key: image.key };
+      await s3Config.send(new DeleteObjectCommand(params));
+      console.log(`Successfully deleted image with key: ${image.key}`);
+    }
   } catch (error) {
     console.error(`Error deleting image with key: ${image.key}`, error);
     return res.status(500).json({ success: false, message: "Error deleting image from S3" });

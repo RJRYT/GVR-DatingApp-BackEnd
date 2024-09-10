@@ -239,8 +239,8 @@ async function verifyOtp(phoneNumber, otp) {
 
 // Function to handle OTP verification and user update
 exports.verifyCode = CatchAsync(async (req, res) => {
-  const { phoneNumber, otp } = req.body;
-  const userId = req.user.id;
+  const { phoneNumber, otp, userId } = req.body;
+  //const userId = req.user.id;
 
   try {
     if (!phoneNumber || !otp) {
