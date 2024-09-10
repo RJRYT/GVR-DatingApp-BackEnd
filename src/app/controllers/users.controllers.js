@@ -216,7 +216,7 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 403, success: false, message: "User id is not valid" });
   }
 
-  const chat = await PrivateChat.findOne({ participants: {$in:[userId, req.user.id]} })
+  const chat = await PrivateChat.findOne({ participants: {$all:[userId, req.user.id]} })
 
   const user = await User.findById(
     userId,
