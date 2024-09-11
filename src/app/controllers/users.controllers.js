@@ -1,4 +1,4 @@
-const { User, FriendRequests, PrivateChat, Session } = require("../models");
+const { User, FriendRequests, PrivateChat, Session, MatchPoints, Preference } = require("../models");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
@@ -9,6 +9,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
+const { calculateMatchPercentage, getDistanceFromLatLonInKm } = require("../util/MatchUtil");
 
 exports.test = (req, res) => {
   res.json({ status: 200, success: true, message: "hello world from users" });
@@ -79,6 +80,30 @@ exports.CheckUser = CatchAsync(async (req, res) => {
     user.currentLocation.longitude = lon;
     await user.save();
   }
+
+  const chats = await PrivateChat.find({ participants: req.user.id }).populate('messages').sort({ updatedAt: -1 });
+  let unreadMessages = 0, unreadChats = 0;
+  await Promise.all(chats.map(async chat => {
+    if (chat.messages.length) {
+      const chatsunreaded = chat.messages.some(message => !message.read && message.sender.toString() !== req.user.id);
+      if (chatsunreaded) unreadChats++;
+      chat.messages.map(message => {
+        if (!message.read && message.sender.toString() !== req.user.id) unreadMessages++;
+      })
+    }
+  }));
+  if (unreadMessages && unreadChats) {
+    user.notifications = user.notifications.filter(notif => notif.type  !== "newMessage");
+    const messageString = `You have ${unreadMessages}+ messages(s) from ${unreadChats} chat(s)`;
+    const notification = {
+      type: "newMessage",
+      message: messageString,
+      from: req.user.id,
+    };
+    user.notifications.push(notification);
+    await user.save();
+  }
+
   res.json({ status: 200, success: true, message: "User found", user });
 });
 
@@ -216,7 +241,13 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     return res.json({ status: 403, success: false, message: "User id is not valid" });
   }
 
-  const chat = await PrivateChat.findOne({ participants: {$all:[userId, req.user.id]} })
+  const matchPoints = await MatchPoints.findOne({});
+
+  const preferences = await Preference.findOne({ userId:req.user.id }) || {};
+
+  const requester = await User.findById(req.user.id);
+
+  const chat = await PrivateChat.findOne({ participants: { $all: [userId, req.user.id] } })
 
   const user = await User.findById(
     userId,
@@ -234,7 +265,16 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
     await user.save();
   }
 
-  res.json({ status: 200, success: true, user, chat:chat?._id, message: "User found" });
+  const UpdatedUser = await User.findById(
+    userId,
+    "username age dateOfBirth gender location hobbies interests smokingHabits drinkingHabits qualification profilePic shortReel"
+  ).lean();
+
+  const matchPercentage = await calculateMatchPercentage(UpdatedUser, preferences, matchPoints);
+  const distanceFromUser = await getDistanceFromLatLonInKm(requester.location.latitude, requester.location.longitude, UpdatedUser.location.latitude, UpdatedUser.location.longitude);
+  const modifiedUser = {...UpdatedUser, matchPercentage: matchPercentage.toFixed(2), distance: distanceFromUser.toFixed(2)}
+
+  res.json({ status: 200, success: true, user:modifiedUser, chat: chat?._id, message: "User found" });
 });
 
 exports.rejectUserProfile = CatchAsync(async (req, res) => {
@@ -497,7 +537,7 @@ exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
   const pendingFriends = await FriendRequests.find({
     recipient: req.user.id,
     status: "pending",
-  }).populate("sender", "username profilePic");
+  }).populate("sender", "username profilePic about").lean();
 
   if (!pendingFriends.length)
     return res.json({
@@ -506,11 +546,12 @@ exports.fetchMyPendingRequests = CatchAsync(async (req, res) => {
       message: "Nothing to show",
     });
 
+  const filteredRequests = pendingFriends.filter(req => req.sender !== null);
   return res.json({
     success: true,
     status: 200,
     message: `Friends pending friend list`,
-    pending: pendingFriends,
+    pending: filteredRequests,
   });
 });
 
@@ -520,18 +561,20 @@ exports.fetchFriendRequests = CatchAsync(async (req, res) => {
     const friendsReqs = await FriendRequests.find({
       status: type,
       sender: req.user.id,
-    }).populate("recipient", "username profilePic");
+    }).populate("recipient", "username profilePic about").lean();
     if (!friendsReqs.length)
       return res.json({
         success: false,
         status: 300,
         message: "Nothing to show",
       });
+
+    const filteredRequests = friendsReqs.filter(req => req.recipient !== null);
     return res.json({
       success: true,
       status: 200,
       message: `Friends ${type} list`,
-      [type]: friendsReqs,
+      [type]: filteredRequests,
     });
   } catch (error) {
     console.log(error);
@@ -970,7 +1013,7 @@ exports.updateShortListedUsers = CatchAsync(async (req, res) => {
 exports.listMyShortList = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id).populate(
     "shortlists",
-    "username profilePic"
+    "username profilePic about"
   );
   if (!user)
     return res.json({
@@ -997,7 +1040,7 @@ exports.listMyShortList = CatchAsync(async (req, res) => {
 exports.ListShortListedBy = CatchAsync(async (req, res) => {
   const users = await User.find(
     { shortlists: { $in: [req.user.id] } },
-    "username profilePic"
+    "username profilePic about"
   );
   if (!users.length)
     return res.json({
@@ -1017,7 +1060,7 @@ exports.ListShortListedBy = CatchAsync(async (req, res) => {
 exports.listMyProfileViewers = CatchAsync(async (req, res) => {
   const user = await User.findById(req.user.id).populate(
     "viewers",
-    "username profilePic"
+    "username profilePic about"
   );
   if (!user)
     return res.json({

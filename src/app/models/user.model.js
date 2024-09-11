@@ -2,20 +2,20 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const ProfilePicSchema = mongoose.Schema({
-  url: { type: String, required: true },
-  key: { type: String, required: true },
+  url: { type: String },
+  key: { type: String },
   uploadedAt: { type: Date, default: Date.now },
 });
 
 const ImagesSchema = mongoose.Schema({
-  url: { type: String, required: true },
-  key: { type: String, required: true },
+  url: { type: String },
+  key: { type: String },
   uploadedAt: { type: Date, default: Date.now },
 });
 
 const ShortReelSchema = mongoose.Schema({
-  url: { type: String, required: true },
-  key: { type: String, required: true },
+  url: { type: String },
+  key: { type: String },
   uploadedAt: { type: Date, default: Date.now },
 });
 
