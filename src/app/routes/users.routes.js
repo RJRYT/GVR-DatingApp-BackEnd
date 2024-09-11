@@ -33,6 +33,11 @@ router.post(
   AuthMiddleware,
   UserController.updateUserPurposeDetails
 );
+router.get(
+  "/stories",
+  AuthMiddleware,
+  UserController.displayStories
+);
 
 router.get("/profile/:userId", AuthMiddleware, UserController.fetchUserDetails);
 

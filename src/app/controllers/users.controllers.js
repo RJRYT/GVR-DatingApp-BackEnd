@@ -167,7 +167,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.dateOfBirth = req.body.dateOfBirth;
   user.gender = req.body.gender;
   user.hobbies = JSON.parse(req.body.hobbies);
-  user.location = JSON.parse(req.body.location);
+  user.location =  JSON.parse(req.body.location);
   user.interests = JSON.parse(req.body.interests);
   user.smokingHabits = req.body.smokingHabits;
   user.drinkingHabits = req.body.drinkingHabits;
@@ -175,6 +175,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.personalInfoSubmitted = true;
 
   await user.save();
+  console.log(user,'user......')
   return res.json({ status: 200, success: true, message: "Upload done", user });
 });
 
@@ -498,6 +499,37 @@ exports.updateProfile = CatchAsync(async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to update profile", error: error.message });
   }
 });
+
+exports.displayStories = CatchAsync(async (req,res) => {
+ 
+  const user=await User.findById(req.user.id)
+  .populate({
+    path:'friends',
+    select:'username shortReel profilePic'
+  })
+  .exec()
+  console.log(user)
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const userStory = {
+    username: user.username,
+    profilePic:user.profilePic ? user.profilePic.url:null,
+    shortReel: user.shortReel ? user.shortReel.url : null,  // Assuming you want the first short reel
+  };
+
+  const friendsStories = user.friends.map(friend => ({
+    username: friend.username,
+    profilePic:friend.profilePic ? friend.profilePic.url:null,
+    shortReel: friend.shortReel ? friend.shortReel.url : null,
+  }));
+
+  const stories = [userStory, ...friendsStories];
+  console.log(userStory,"............")
+  res.status(200).json({ stories });
+})
 
 exports.MarkNotificationAsRead = CatchAsync(async (req, res) => {
   const { notificationId } = req.body;
@@ -939,7 +971,6 @@ exports.verifyTwoFAToken = CatchAsync(async (req, res) => {
   }
 });
 
-
 exports.getActiveSessions = async (req, res) => {
   try {
     const sessions = await Session.find({ userId: req.user.id });
@@ -1083,7 +1114,6 @@ exports.listMyProfileViewers = CatchAsync(async (req, res) => {
     viewers: user.viewers,
   });
 });
-
 
 exports.deleteImage = CatchAsync(async (req, res) => {
   const { imageUrl } = req.body;
