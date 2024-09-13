@@ -93,7 +93,7 @@ exports.CheckUser = CatchAsync(async (req, res) => {
     }
   }));
   if (unreadMessages && unreadChats) {
-    user.notifications = user.notifications.filter(notif => notif.type  !== "newMessage");
+    user.notifications = user.notifications.filter(notif => notif.type !== "newMessage");
     const messageString = `You have ${unreadMessages}+ messages(s) from ${unreadChats} chat(s)`;
     const notification = {
       type: "newMessage",
@@ -167,7 +167,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.dateOfBirth = req.body.dateOfBirth;
   user.gender = req.body.gender;
   user.hobbies = JSON.parse(req.body.hobbies);
-  user.location =  JSON.parse(req.body.location);
+  user.location = JSON.parse(req.body.location);
   user.interests = JSON.parse(req.body.interests);
   user.smokingHabits = req.body.smokingHabits;
   user.drinkingHabits = req.body.drinkingHabits;
@@ -175,7 +175,7 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.personalInfoSubmitted = true;
 
   await user.save();
-  console.log(user,'user......')
+  console.log(user, 'user......')
   return res.json({ status: 200, success: true, message: "Upload done", user });
 });
 
@@ -244,7 +244,7 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 
   const matchPoints = await MatchPoints.findOne({});
 
-  const preferences = await Preference.findOne({ userId:req.user.id }) || {};
+  const preferences = await Preference.findOne({ userId: req.user.id }) || {};
 
   const requester = await User.findById(req.user.id);
 
@@ -273,9 +273,9 @@ exports.fetchUserDetails = CatchAsync(async (req, res) => {
 
   const matchPercentage = await calculateMatchPercentage(UpdatedUser, preferences, matchPoints);
   const distanceFromUser = await getDistanceFromLatLonInKm(requester.location.latitude, requester.location.longitude, UpdatedUser.location.latitude, UpdatedUser.location.longitude);
-  const modifiedUser = {...UpdatedUser, matchPercentage: matchPercentage.toFixed(2), distance: distanceFromUser.toFixed(2)}
+  const modifiedUser = { ...UpdatedUser, matchPercentage: matchPercentage.toFixed(2), distance: distanceFromUser.toFixed(2) }
 
-  res.json({ status: 200, success: true, user:modifiedUser, chat: chat?._id, message: "User found" });
+  res.json({ status: 200, success: true, user: modifiedUser, chat: chat?._id, message: "User found" });
 });
 
 exports.rejectUserProfile = CatchAsync(async (req, res) => {
@@ -500,15 +500,14 @@ exports.updateProfile = CatchAsync(async (req, res) => {
   }
 });
 
-exports.displayStories = CatchAsync(async (req,res) => {
- 
-  const user=await User.findById(req.user.id)
-  .populate({
-    path:'friends',
-    select:'username shortReel profilePic'
-  })
-  .exec()
-  console.log(user)
+exports.displayStories = CatchAsync(async (req, res) => {
+
+  const user = await User.findById(req.user.id)
+    .populate({
+      path: 'friends',
+      select: 'username shortReel profilePic'
+    })
+    .exec();
 
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
@@ -516,18 +515,17 @@ exports.displayStories = CatchAsync(async (req,res) => {
 
   const userStory = {
     username: user.username,
-    profilePic:user.profilePic ? user.profilePic.url:null,
+    profilePic: user.profilePic ? user.profilePic.url : null,
     shortReel: user.shortReel ? user.shortReel.url : null,  // Assuming you want the first short reel
   };
 
   const friendsStories = user.friends.map(friend => ({
     username: friend.username,
-    profilePic:friend.profilePic ? friend.profilePic.url:null,
+    profilePic: friend.profilePic ? friend.profilePic.url : null,
     shortReel: friend.shortReel ? friend.shortReel.url : null,
   }));
 
   const stories = [userStory, ...friendsStories];
-  console.log(userStory,"............")
   res.status(200).json({ stories });
 })
 
