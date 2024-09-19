@@ -12,3 +12,9 @@ exports.generateRefreshToken = (user) => {
     expiresIn: "7d",
   });
 };
+
+exports.generateAdminToken = (admin) => {
+  return jwt.sign(admin, process.env.JWT_ACCESS_TOKEN_SECRET, {
+    expiresIn: "1d",
+  });
+};

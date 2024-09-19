@@ -22,4 +22,4 @@ AdminSchema.pre("save", async function (next) {
     next();
   });
 
-  module.exports = mongoose.model('adminDetails', AdminSchema);
+  module.exports = mongoose.model('admin', AdminSchema);

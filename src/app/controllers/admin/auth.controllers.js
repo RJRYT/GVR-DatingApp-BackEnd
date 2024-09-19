@@ -1,21 +1,21 @@
 const jwt = require("jsonwebtoken");
 const CatchAsync = require("../../util/catchAsync");
 const bcrypt = require("bcryptjs");
-const Admin = require("../../models/Admin/adminDetails.model")
+const { Admin } = require("../../models");
+const { generateAdminToken } = require("../../services/token.services");
 
+exports.test = (req, res) => {
+  res.json({ status: 200, success: true, message: "hello world from admin auth" });
+};
 
-const JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET
-const JWT_ADMIN_REFRESH_SECRET = process.env.JWT_ADMIN_REFRESH_SECRET
-
-exports.adminLogin = CatchAsync( async (req, res) => {
+exports.adminLogin = CatchAsync(async (req, res) => {
   const { email, password } = req.body;
-//   console.log("Credentials:",req.body);
-  
+
   try {
     // Check if user exists
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      return res.status(400).json({ success:false, message: 'Invalid email or password' });
+      return res.status(400).json({ success: false, message: 'Invalid email or password' });
     }
 
     // Compare password with hashed password in DB
@@ -25,10 +25,15 @@ exports.adminLogin = CatchAsync( async (req, res) => {
     }
 
     // Create and send JWT token
-    const adminToken = jwt.sign({ adminId: admin._id }, JWT_ADMIN_SECRET);
-    const refreshToken = jwt.sign({ adminId: admin._id }, JWT_ADMIN_REFRESH_SECRET);
+    const adminToken = generateAdminToken({ adminId: admin._id });
 
-    res.status(200).json({ success: true, message: "Loggined as Admin", accessToken: adminToken , refreshToken: refreshToken});
+    res.cookie("adminToken", adminToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+    });
+
+    res.status(200).json({ success: true, message: "Log-in success", adminToken });
   } catch (error) {
     console.error(error)
     res.status(500).json({ success: false, message: 'Server error' });
