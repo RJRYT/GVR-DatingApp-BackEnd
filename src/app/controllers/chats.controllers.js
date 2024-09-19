@@ -1,5 +1,4 @@
-const { formatWithOptions } = require("util");
-const { User, ChatRequests, PrivateChat, GroupChat, PrivateMessages } = require("../models");
+const { User, PrivateChat, GroupChat, PrivateMessages } = require("../models");
 const CatchAsync = require("../util/catchAsync");
 const mongoose = require("mongoose");
 

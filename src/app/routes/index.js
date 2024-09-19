@@ -4,7 +4,8 @@ const AuthRoutes = require("./auth.routes");
 const MatchesRoutes = require("./matches.routes");
 const UsersRoutes = require("./users.routes");
 const ChatRoutes = require("./chats.routes");
-const authRoutes = require("./Admin/AuthRoutes");
+
+const adminRoutes = require("./admin");
 
 const router = express.Router();
 
@@ -16,7 +17,9 @@ router.use("/api/auth", AuthRoutes);
 router.use("/api/matches", MatchesRoutes);
 router.use("/api/users", UsersRoutes);
 router.use("/api/chats", ChatRoutes);
-router.use("/api/admin/auth",authRoutes)
+
+// admin sub route
+router.use("/api/admin/", adminRoutes);
 
 // Notfound handling
 router.use(NotFoundMiddleware);
