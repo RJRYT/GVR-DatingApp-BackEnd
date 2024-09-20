@@ -39,3 +39,8 @@ exports.adminLogin = CatchAsync(async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+exports.adminLogout = CatchAsync(async (req, res) => {
+  res.clearCookie("adminToken");
+  res.json({ status: 200, success: true, message: "Logout successful" });
+});
