@@ -8,7 +8,7 @@ const AdminSchema = mongoose.Schema({
     phoneNumber: { type: String, unique: true, sparse: true },
     nationality: { type: String },
     password : { type: String },
-    designation : { type: String }
+    designation: { label: String, value: String }
 })
 
 AdminSchema.index({ email: 1 }, { unique: true, sparse: true });
