@@ -175,7 +175,6 @@ exports.updateUserPersonalDetails = CatchAsync(async (req, res) => {
   user.personalInfoSubmitted = true;
 
   await user.save();
-  console.log(user, 'user......')
   return res.json({ status: 200, success: true, message: "Upload done", user });
 });
 
@@ -884,7 +883,7 @@ exports.generateTwoFASecret = CatchAsync(async (req, res) => {
 
 exports.verifyTwoFACode = CatchAsync(async (req, res) => {
   const { token } = req.body;  // The 6-digit code from the user
-  console.log(token)
+
   const user = await User.findById(req.user.id);
 
   if (!user) {
@@ -1133,7 +1132,6 @@ exports.deleteImage = CatchAsync(async (req, res) => {
     if (image.key) {
       const params = { Bucket: process.env.S3_BUCKET, Key: image.key };
       await s3Config.send(new DeleteObjectCommand(params));
-      console.log(`Successfully deleted image with key: ${image.key}`);
     }
   } catch (error) {
     console.error(`Error deleting image with key: ${image.key}`, error);

@@ -217,8 +217,6 @@ async function verifyOtp(phoneNumber, otp) {
   }
 
   try {
-    console.log('Verifying OTP for phone number:', phoneNumber); // Debugging line
-
     const verificationCheck = await client.verify.v2
       .services(process.env.TWILIO_SERVICE_SID)
       .verificationChecks

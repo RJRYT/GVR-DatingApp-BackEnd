@@ -3,7 +3,6 @@ const { Admin } = require("../../models");
 
 // Middleware to protect routes
 module.exports = async(req, res, next) => {
-  console.log("subscription....")
   const token = req.header("x-auth-admintoken") || req.cookies.adminToken;
   if (!token)
     return res.status(401).json({ status: 401, success: false, message: "No token, authorization denied" });

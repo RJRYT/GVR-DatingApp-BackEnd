@@ -18,7 +18,7 @@ exports.fetchAdminDetails = CatchAsync(async (req, res) => {
 });
 
 exports.addSubscription = CatchAsync(async (req, res) => {
-  console.log(req.body) 
+
   try {  
     const { name, price, duration, subscriptiontype, description } = req.body;
     const newSubscription = new Subscription({
