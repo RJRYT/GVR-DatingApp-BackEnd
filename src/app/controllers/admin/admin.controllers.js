@@ -18,22 +18,22 @@ exports.fetchAdminDetails = CatchAsync(async (req, res) => {
 });
 
 exports.addSubscription = CatchAsync(async (req, res) => {
-  try {
+  console.log(req.body) 
+  try {  
     const { name, price, duration, subscriptiontype, description } = req.body;
     const newSubscription = new Subscription({
       name,
       price,
       duration,
       subscriptiontype,
-      image,
       description,
     });
-
-    const savedSubscription = await newSubscription.save();
+    await newSubscription.save();
     return res.status(201).json({
       message: "Subscription added successfully",
-      subscription: savedSubscription,
+      subscription: newSubscription,
     });
+    
   } catch (error) {
     return res.status(500).json({
       message: "Error adding subscription",
@@ -98,3 +98,25 @@ exports.updateAdminProfile = CatchAsync( async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to update admin profile", error: error.message });
   }
 });
+
+exports.getSubscription =CatchAsync(async(req,res) => {
+  try {
+    const subscriptions = await Subscription.find()
+    return res.status(200).json(subscriptions)
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error fetching subscriptions",
+      error: error.message,
+    });
+  }
+})
+
+exports.deleteSubscription=CatchAsync(async (req,res) =>{
+  try {
+    const subscriptionId = req.params.id;
+    await Subscription.findByIdAndDelete(subscriptionId);
+    return res.status(200).json({ success: true, message: "Subscription deleted" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Error deleting subscription" });
+  }
+})

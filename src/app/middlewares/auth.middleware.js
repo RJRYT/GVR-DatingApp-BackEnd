@@ -3,6 +3,7 @@ const { User, Session } = require("../models");
 
 // Middleware to protect routes
 module.exports = async(req, res, next) => {
+  
   const token = req.header("x-auth-token") || req.cookies.accessToken;
   if (!token)
     return res.status(401).json({ status: 401, success: false, message: "No token, authorization denied" });
