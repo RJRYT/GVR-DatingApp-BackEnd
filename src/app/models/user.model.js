@@ -80,10 +80,11 @@ const UserSchema = mongoose.Schema(
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
     lastLogin: { type: Date, default: Date.now },
-    twoFA : { type: Boolean, default: false },
-    twoFASecret :{type : String},
+    twoFA: { type: Boolean, default: false },
+    twoFASecret: { type: String },
     lastDeviceName: { type: String },
     lastIpAddress: { type: String },
+    primeUser: { type: Boolean, default: false },
     fake: { type: Boolean }
   },
   { timestamps: true }

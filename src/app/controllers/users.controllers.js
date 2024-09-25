@@ -1,4 +1,4 @@
-const { User, FriendRequests, PrivateChat, Session, MatchPoints, Preference } = require("../models");
+const { User, FriendRequests, PrivateChat, Session, MatchPoints, Preference, Subscriptions } = require("../models");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const s3Config = require("../config/aws.config");
@@ -1153,4 +1153,12 @@ exports.deleteImage = CatchAsync(async (req, res) => {
     console.error("Error saving user:", error);
     return res.status(500).json({ success: false, message: "Failed to update user profile", error: error.message });
   }
+});
+
+exports.getPrimePlan = CatchAsync(async (req, res) => {
+  const plan = await Subscriptions.findOne({status:"active"});
+
+  if(!plan) return res.status(200).json({ success: false, message: "No plan avaliable to show" });
+
+  res.status(200).json({ success: true, message: "current prime plan", plan });
 });

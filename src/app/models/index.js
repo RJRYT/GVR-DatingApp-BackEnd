@@ -8,3 +8,4 @@ exports.PrivateChat = require("./Messaging/privatechat.model");
 exports.GroupChat = require("./Messaging/groupchat.model");
 exports.MatchPoints = require("./Admin/matchPoints.model");
 exports.Admin = require("./Admin/admin.model");
+exports.Subscriptions = require("./Admin/subscription.model");

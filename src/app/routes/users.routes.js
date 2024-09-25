@@ -117,5 +117,6 @@ router.delete('/sessions', AuthMiddleware, UserController.deleteAllSessions);
 
 router.delete('/delete-image', AuthMiddleware, UserController.deleteImage);
 
+router.get('/plan', AuthMiddleware, UserController.getPrimePlan);
 
 module.exports = router;
